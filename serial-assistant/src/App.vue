@@ -60,6 +60,90 @@ watch(motorAddr, (v) => {
   if (v > 255) motorAddr.value = 255;
 });
 
+// ---- 系统参数 ----
+const pendingSysRead = ref(false);
+const sysParams = ref({
+  busVoltage:      "--",
+  phaseCurrent:    "--",
+  fluxLinkage:     "--",
+  phaseResistance: "--",
+  phaseInductance: "--",
+  realSpeed:       "--",
+  targetPos:       "--",
+  realPos:         "--",
+  posError:        "--",
+  pulseCount:      "--",
+  enableFlag:      "--",
+  inPosFlag:       "--",
+  stallFlag:       "--",
+});
+
+// 自定义协议: [C5] [addr] [code] [data...] [checksum] [5C]
+function customFrame(addr: number, code: number, data: number[] = []): number[] {
+  const head = [0xC5, addr, code, ...data];
+  let sum = 0;
+  for (const b of head) sum += b;
+  return [...head, sum & 0xFF, 0x5C];
+}
+
+function sendSysReadCmd() {
+  const frame = customFrame(motorAddr.value, 0x31);
+  pendingSysRead.value = true;
+  invoke("send_serial", { data: frame }).then(() => {
+    recordSend(frame);
+  }).catch((e) => {
+    errorMsg.value = e as string;
+  });
+}
+
+function parseFloat32BE(bytes: number[], off: number): number {
+  const buf = new ArrayBuffer(4);
+  const dv = new DataView(buf);
+  dv.setUint8(0, bytes[off]);
+  dv.setUint8(1, bytes[off+1]);
+  dv.setUint8(2, bytes[off+2]);
+  dv.setUint8(3, bytes[off+3]);
+  return dv.getFloat32(0);
+}
+
+function parseInt32BE(bytes: number[], off: number): number {
+  return ((bytes[off] << 24) | (bytes[off+1] << 16) | (bytes[off+2] << 8) | bytes[off+3]) >>> 0;
+}
+
+function parseInt16BE(bytes: number[], off: number): number {
+  return ((bytes[off] << 8) | bytes[off+1]) >>> 0;
+}
+
+function parseSysParams(raw: number[]): boolean {
+  // 响应: [C5] [addr] [31] [err] [40 bytes payload] [checksum] [5C] = 46 bytes
+  // 查找 C5 xx 31 01 的位置（可能前面有指令回响）
+  let off = -1;
+  for (let i = 0; i <= raw.length - 46; i++) {
+    if (raw[i] === 0xC5 && raw[i+2] === 0x31 && raw[i+3] === 0x01) {
+      off = i; break;
+    }
+  }
+  if (off < 0) return false;
+  const p = raw.slice(off + 4, off + 44);
+
+  sysParams.value = {
+    busVoltage:      parseFloat32BE(p, 0).toFixed(2) + " V",
+    phaseCurrent:    parseInt16BE(p, 4) + " mA",
+    fluxLinkage:     parseFloat32BE(p, 6).toFixed(3) + " mWb",
+    phaseResistance: parseFloat32BE(p, 10).toFixed(3) + " Ω",
+    phaseInductance: parseFloat32BE(p, 14).toFixed(3) + " mH",
+    realSpeed:       parseInt16BE(p, 18) + " RPM",
+    targetPos:       parseInt32BE(p, 20).toString(),
+    realPos:         parseInt32BE(p, 24).toString(),
+    posError:        parseInt32BE(p, 28).toString(),
+    pulseCount:      parseInt32BE(p, 32).toString(),
+    enableFlag:      p[36] === 1 ? "已使能" : "未使能",
+    inPosFlag:       p[38] === 1 ? "已到位" : "未到位",
+    stallFlag:       p[37] === 1 ? "已堵转" : "未堵转",
+  };
+  return true;
+}
+
 let unlisten: UnlistenFn | null = null;
 
 // ---- 串口操作 ----
@@ -177,6 +261,9 @@ function scrollToBottom() {
 onMounted(async () => {
   await fetchPorts(true);
   unlisten = await listen<number[]>("serial-data", (event) => {
+    if (pendingSysRead.value && parseSysParams(event.payload)) {
+      pendingSysRead.value = false;
+    }
     recordRecv(event.payload);
     scrollToBottom();
   });
@@ -281,27 +368,17 @@ onUnmounted(() => {
                       v-model.number="motorAddr"
                       type="number" min="0" max="255"
                       :disabled="isOpen"
-                      class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono"
+                      class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 outline-none font-mono"
                       title="电机地址 0x00-0xFF" />
-                    <button @click="motorAddr = Math.min(255, motorAddr + 1)" :disabled="isOpen"
-                      class="px-2 text-sm font-medium border-y border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">+</button>
-                    <button @click="motorAddr = Math.max(0, motorAddr - 1)" :disabled="isOpen"
-                      class="px-2 text-sm font-medium rounded-r-md border-y border-r border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">−</button>
+                    <button @click="motorAddr = Math.min(255, motorAddr + 1)"
+                      class="px-2 text-sm font-medium border-y border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">+</button>
+                    <button @click="motorAddr = Math.max(0, motorAddr - 1)"
+                      class="px-2 text-sm font-medium rounded-r-md border-y border-r border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">−</button>
                   </div>
                 </div>
               </div>
             </div>
             <div class="px-3 pb-3">
-            </div>
-          </div>
-
-          <!-- 系统参数（独立面板，始终可见） -->
-          <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
-            <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-              <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">系统参数</span>
-            </div>
-            <div class="p-3 space-y-3 text-xs text-gray-500 dark:text-gray-400">
-              <div>系统参数（待实现）</div>
             </div>
           </div>
 
@@ -313,19 +390,46 @@ onUnmounted(() => {
                 <div class="flex items-center gap-1.5">
                   <label class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">电机地址</label>
                   <div class="flex items-stretch">
-                    <input v-model.number="motorAddr" type="number" min="0" max="255" :disabled="isOpen"
-                      class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono"
+                    <input v-model.number="motorAddr" type="number" min="0" max="255"
+                      class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 outline-none font-mono"
                       title="电机地址 0x00-0xFF" />
-                    <button @click="motorAddr = Math.min(255, motorAddr + 1)" :disabled="isOpen"
-                      class="px-2 text-sm font-medium border-y border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">+</button>
-                    <button @click="motorAddr = Math.max(0, motorAddr - 1)" :disabled="isOpen"
-                      class="px-2 text-sm font-medium rounded-r-md border-y border-r border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">−</button>
+                    <button @click="motorAddr = Math.min(255, motorAddr + 1)"
+                      class="px-2 text-sm font-medium border-y border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">+</button>
+                    <button @click="motorAddr = Math.max(0, motorAddr - 1)"
+                      class="px-2 text-sm font-medium rounded-r-md border-y border-r border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">−</button>
                   </div>
                 </div>
               </div>
             </div>
             <div class="p-3 space-y-3 text-xs text-gray-500 dark:text-gray-400">
               <div>运动控制页面（待实现）</div>
+            </div>
+          </div>
+
+          <!-- 系统参数（始终在运动控制下方） -->
+          <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+              <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">系统参数</span>
+              <button @click="sendSysReadCmd" :disabled="!isOpen"
+                class="px-2.5 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
+                读取系统参数
+              </button>
+            </div>
+            <div class="p-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">总线电压</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.busVoltage }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">相电流</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.phaseCurrent }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">电机磁链</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.fluxLinkage }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">相电阻</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.phaseResistance }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">相电感</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.phaseInductance }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">实时转速</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.realSpeed }}</span></div>
+              <div class="flex justify-between col-span-2 border-t border-gray-100 dark:border-gray-800 pt-1.5 mt-0.5"></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">目标位置</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.targetPos }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">实时位置</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.realPos }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">位置误差</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.posError }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">累计脉冲</span><span class="font-mono text-gray-700 dark:text-gray-200">{{ sysParams.pulseCount }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">使能标志</span><span :class="sysParams.enableFlag === '已使能' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'" class="font-mono">{{ sysParams.enableFlag }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">到位标志</span><span :class="sysParams.inPosFlag === '已到位' ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-500 dark:text-orange-400'" class="font-mono">{{ sysParams.inPosFlag }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">堵转情况</span><span :class="sysParams.stallFlag === '已堵转' ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'" class="font-mono">{{ sysParams.stallFlag }}</span></div>
             </div>
           </div>
         </div>
