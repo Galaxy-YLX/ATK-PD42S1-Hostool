@@ -17,9 +17,6 @@ watch(theme, (t) => {
 const ports = ref<string[]>([]);
 const selectedPort = ref("");
 const baudRate = ref(115200);
-const dataBits = ref(8);
-const stopBits = ref(1);
-const parity = ref("None");
 const isOpen = ref(false);
 const errorMsg = ref("");
 
@@ -53,63 +50,15 @@ function totalBytes(): number {
 const sendMode = ref<"text" | "hex">("hex");
 const sendData = ref("");
 
+// ---- 页面切换 ----
+const currentPage = ref("设备设置");
+
 // ---- 协议指令 ----
 const motorAddr = ref(1);
-const targetPosition = ref("");
-const targetSpeed = ref("");
-const customCmd = ref("");
-
 watch(motorAddr, (v) => {
   if (v < 0) motorAddr.value = 0;
   if (v > 255) motorAddr.value = 255;
 });
-
-function addrHex(): string {
-  return motorAddr.value.toString(16).padStart(2, "0");
-}
-
-async function sendHexCmd(hex: string) {
-  const clean = hex.replace(/\s+/g, "");
-  const data: number[] = [];
-  for (let i = 0; i < clean.length; i += 2) {
-    data.push(parseInt(clean.substring(i, i + 2), 16));
-  }
-  try {
-    await invoke("send_serial", { data });
-    recordSend(data);
-  } catch (error) {
-    errorMsg.value = error as string;
-  }
-}
-
-function setPosition() {
-  if (!targetPosition.value) return;
-  const pos = parseInt(targetPosition.value);
-  const buf = new ArrayBuffer(4);
-  new DataView(buf).setInt32(0, pos, false);
-  const data = Array.from(new Uint8Array(buf));
-  const frame = [motorAddr.value, 0x10, 0x00, 0x02, 0x00, 0x02, 0x04, ...data];
-  sendHexCmd(frame.map(b => b.toString(16).padStart(2, "0")).join(" "));
-}
-
-function readPosition() {
-  sendHexCmd(`${addrHex()} 03 00 02 00 02`);
-}
-
-function setSpeed() {
-  if (!targetSpeed.value) return;
-  const speed = parseInt(targetSpeed.value);
-  const buf = new ArrayBuffer(4);
-  new DataView(buf).setInt32(0, speed, false);
-  const data = Array.from(new Uint8Array(buf));
-  const frame = [motorAddr.value, 0x10, 0x00, 0x04, 0x00, 0x02, 0x04, ...data];
-  sendHexCmd(frame.map(b => b.toString(16).padStart(2, "0")).join(" "));
-}
-
-function sendCustomCmd() {
-  if (!customCmd.value) return;
-  sendHexCmd(customCmd.value);
-}
 
 let unlisten: UnlistenFn | null = null;
 
@@ -143,9 +92,9 @@ async function openSerial() {
     await invoke("open_serial", {
       portName: selectedPort.value,
       baudRate: baudRate.value,
-      dataBits: dataBits.value,
-      stopBits: stopBits.value,
-      parity: parity.value,
+      dataBits: 8,
+      stopBits: 1,
+      parity: "None",
     });
     isOpen.value = true;
     errorMsg.value = "";
@@ -247,7 +196,7 @@ onUnmounted(() => {
 
       <!-- 标题栏 -->
       <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-semibold tracking-tight">串口助手</h1>
+        <h1 class="text-xl font-semibold tracking-tight">正点原子步进电机驱动器上位机 V2.0</h1>
         <button
           @click="toggleTheme"
           class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -290,30 +239,6 @@ onUnmounted(() => {
           </select>
         </div>
 
-        <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">数据位</label>
-          <select v-model="dataBits" :disabled="isOpen"
-            class="select-arrow pr-7 pl-2.5 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none">
-            <option :value="8">8</option><option :value="7">7</option><option :value="6">6</option><option :value="5">5</option>
-          </select>
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">停止位</label>
-          <select v-model="stopBits" :disabled="isOpen"
-            class="select-arrow pr-7 pl-2.5 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none">
-            <option :value="1">1</option><option :value="2">2</option>
-          </select>
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">校验位</label>
-          <select v-model="parity" :disabled="isOpen"
-            class="select-arrow pr-7 pl-2.5 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none">
-            <option value="None">None</option><option value="Even">Even</option><option value="Odd">Odd</option>
-          </select>
-        </div>
-
         <button @click="toggleSerial"
           :class="isOpen
             ? 'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600'
@@ -329,12 +254,26 @@ onUnmounted(() => {
 
       <!-- 主内容区：两栏 -->
       <div class="flex gap-3">
-        <!-- 左侧：自定义协议指令栏 -->
+        <!-- 左侧：页面切换 + 功能面板 -->
         <div class="w-[340px] shrink-0 flex flex-col gap-3">
-          <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+          <!-- 页面切换栏 -->
+          <div class="flex rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+            <button
+              v-for="page in ['设备设置', '运动控制']"
+              :key="page"
+              @click="currentPage = page"
+              :class="currentPage === page
+                ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                : 'text-gray-500 dark:text-gray-500 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'"
+              class="flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors"
+            >{{ page }}</button>
+          </div>
+
+          <!-- 设备设置页 -->
+          <div v-if="currentPage === '设备设置'" class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">协议指令</span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">设备设置</span>
                 <div class="flex items-center gap-1.5">
                   <label class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">电机地址</label>
                   <div class="flex items-stretch">
@@ -352,74 +291,41 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <div class="px-3 pb-3 space-y-3">
-              <!-- 电机控制 -->
-              <div>
-                <label class="block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 mb-2">电机控制</label>
-                <div class="grid grid-cols-2 gap-1.5">
-                  <button @click="sendHexCmd(`${addrHex()} 06 00 00 00 01`)" :disabled="!isOpen"
-                    class="px-2 py-1.5 text-xs font-medium rounded border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 disabled:opacity-40 transition-colors">
-                    使能
-                  </button>
-                  <button @click="sendHexCmd(`${addrHex()} 06 00 00 00 00`)" :disabled="!isOpen"
-                    class="px-2 py-1.5 text-xs font-medium rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 disabled:opacity-40 transition-colors">
-                    失能
-                  </button>
-                  <button @click="sendHexCmd(`${addrHex()} 06 00 01 00 01`)" :disabled="!isOpen"
-                    class="px-2 py-1.5 text-xs font-medium rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 disabled:opacity-40 transition-colors">
-                    启动
-                  </button>
-                  <button @click="sendHexCmd(`${addrHex()} 06 00 01 00 00`)" :disabled="!isOpen"
-                    class="px-2 py-1.5 text-xs font-medium rounded border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900 disabled:opacity-40 transition-colors">
-                    停止
-                  </button>
-                </div>
-              </div>
+            <div class="px-3 pb-3">
+            </div>
+          </div>
 
-              <!-- 位置控制 -->
-              <div>
-                <label class="block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 mb-2">位置控制</label>
-                <div class="flex gap-1.5 mb-1.5">
-                  <input v-model="targetPosition" placeholder="目标位置"
-                    class="flex-1 px-2.5 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono" />
-                </div>
-                <div class="grid grid-cols-2 gap-1.5">
-                  <button @click="setPosition" :disabled="!isOpen"
-                    class="px-2 py-1.5 text-xs font-medium rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 disabled:opacity-40 transition-colors">
-                    设置位置
-                  </button>
-                  <button @click="readPosition" :disabled="!isOpen"
-                    class="px-2 py-1.5 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors">
-                    读取位置
-                  </button>
-                </div>
-              </div>
+          <!-- 系统参数（独立面板，始终可见） -->
+          <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+              <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">系统参数</span>
+            </div>
+            <div class="p-3 space-y-3 text-xs text-gray-500 dark:text-gray-400">
+              <div>系统参数（待实现）</div>
+            </div>
+          </div>
 
-              <!-- 速度控制 -->
-              <div>
-                <label class="block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 mb-2">速度控制</label>
-                <div class="flex gap-1.5 mb-1.5">
-                  <input v-model="targetSpeed" placeholder="目标速度 (rpm)"
-                    class="flex-1 px-2.5 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono" />
-                </div>
-                <button @click="setSpeed" :disabled="!isOpen"
-                  class="w-full px-2 py-1.5 text-xs font-medium rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 disabled:opacity-40 transition-colors">
-                  设置速度
-                </button>
-              </div>
-
-              <!-- 通用 -->
-              <div>
-                <label class="block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 mb-2">通用指令</label>
-                <div class="flex gap-1.5">
-                  <input v-model="customCmd" placeholder="HEX 指令"
-                    class="flex-1 px-2.5 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono" />
-                  <button @click="sendCustomCmd" :disabled="!isOpen"
-                    class="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
-                    发送
-                  </button>
+          <!-- 运动控制页 -->
+          <div v-if="currentPage === '运动控制'" class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">运动控制</span>
+                <div class="flex items-center gap-1.5">
+                  <label class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">电机地址</label>
+                  <div class="flex items-stretch">
+                    <input v-model.number="motorAddr" type="number" min="0" max="255" :disabled="isOpen"
+                      class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono"
+                      title="电机地址 0x00-0xFF" />
+                    <button @click="motorAddr = Math.min(255, motorAddr + 1)" :disabled="isOpen"
+                      class="px-2 text-sm font-medium border-y border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">+</button>
+                    <button @click="motorAddr = Math.max(0, motorAddr - 1)" :disabled="isOpen"
+                      class="px-2 text-sm font-medium rounded-r-md border-y border-r border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">−</button>
+                  </div>
                 </div>
               </div>
+            </div>
+            <div class="p-3 space-y-3 text-xs text-gray-500 dark:text-gray-400">
+              <div>运动控制页面（待实现）</div>
             </div>
           </div>
         </div>
