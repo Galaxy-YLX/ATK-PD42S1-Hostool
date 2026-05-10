@@ -145,6 +145,7 @@ function parseSysParams(raw: number[]): boolean {
 }
 
 let unlisten: UnlistenFn | null = null;
+let unlistenPorts: UnlistenFn | null = null;
 
 // ---- 串口操作 ----
 async function fetchPorts(silent = false) {
@@ -267,10 +268,20 @@ onMounted(async () => {
     recordRecv(event.payload);
     scrollToBottom();
   });
+  unlistenPorts = await listen<string[]>("ports-changed", (event) => {
+    const newPorts = event.payload;
+    ports.value = newPorts;
+    if (!isOpen.value) {
+      if (!selectedPort.value || !newPorts.includes(selectedPort.value)) {
+        selectedPort.value = newPorts.length > 0 ? newPorts[0] : "";
+      }
+    }
+  });
 });
 
 onUnmounted(() => {
   if (unlisten) unlisten();
+  if (unlistenPorts) unlistenPorts();
   if (isOpen.value) {
     invoke("close_serial");
   }

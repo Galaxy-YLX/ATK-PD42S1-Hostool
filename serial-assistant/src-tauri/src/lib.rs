@@ -122,6 +122,24 @@ pub fn run() {
             port: Mutex::new(None),
             running: Mutex::new(false),
         })
+        .setup(|app| {
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let mut prev_ports: Vec<String> = vec![];
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    if let Ok(ports) = serialport::available_ports() {
+                        let port_names: Vec<String> =
+                            ports.iter().map(|p| p.port_name.clone()).collect();
+                        if port_names != prev_ports {
+                            let _ = handle.emit("ports-changed", port_names.clone());
+                            prev_ports = port_names;
+                        }
+                    }
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_serial_ports,
             open_serial,
