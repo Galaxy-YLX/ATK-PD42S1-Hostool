@@ -27,7 +27,7 @@ const baudRates = [9600, 14400, 19200, 38400, 57600, 115200, 230400, 460800, 921
 
 // ---- 数据显示 ----
 interface DataEntry { dir: "send" | "recv"; data: number[] }
-const displayMode = ref<"smart" | "text" | "hex">("smart");
+const displayMode = ref<"text" | "hex">("hex");
 const dataEntries = ref<DataEntry[]>([]);
 const dataViewer = ref<HTMLDivElement>();
 
@@ -50,7 +50,7 @@ function totalBytes(): number {
 }
 
 // ---- 发送 ----
-const sendMode = ref<"text" | "hex">("text");
+const sendMode = ref<"text" | "hex">("hex");
 const sendData = ref("");
 
 // ---- 协议指令 ----
@@ -183,15 +183,6 @@ async function send() {
 }
 
 // ---- 数据显示格式化 ----
-function isPrintable(b: number): boolean {
-  return (b >= 0x20 && b < 0x7f) || b === 0x0a || b === 0x0d || b === 0x09;
-}
-
-function guessIsText(bytes: number[]): boolean {
-  const printable = bytes.filter(isPrintable).length;
-  return bytes.length > 0 && printable / bytes.length > 0.7;
-}
-
 function bytesToHex(bytes: number[]): string {
   return bytes.map(b => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
 }
@@ -208,17 +199,9 @@ function bytesToText(bytes: number[]): string {
 
 function formatEntry(entry: DataEntry): string {
   const prefix = entry.dir === "send" ? "→ " : "← ";
-  if (displayMode.value === "hex") {
-    return prefix + bytesToHex(entry.data);
-  }
-  if (displayMode.value === "text") {
-    return prefix + bytesToText(entry.data);
-  }
-  // smart mode
-  if (guessIsText(entry.data)) {
-    return prefix + bytesToText(entry.data);
-  }
-  return prefix + "[HEX] " + bytesToHex(entry.data);
+  return displayMode.value === "hex"
+    ? prefix + bytesToHex(entry.data)
+    : prefix + bytesToText(entry.data);
 }
 
 function clearData() {
@@ -423,12 +406,6 @@ onUnmounted(() => {
               <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">数据收发</span>
               <div class="flex items-center gap-1.5">
                 <span class="text-[11px] text-gray-400 dark:text-gray-600 mr-2 tabular-nums">{{ totalBytes() }} 字节</span>
-                <button
-                  :class="displayMode === 'smart' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
-                  @click="displayMode = 'smart'"
-                  class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
-                  智能
-                </button>
                 <button
                   :class="displayMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
                   @click="displayMode = 'text'"
