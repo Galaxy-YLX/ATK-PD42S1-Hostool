@@ -54,9 +54,19 @@ const sendMode = ref<"text" | "hex">("hex");
 const sendData = ref("");
 
 // ---- 协议指令 ----
+const motorAddr = ref(1);
 const targetPosition = ref("");
 const targetSpeed = ref("");
 const customCmd = ref("");
+
+watch(motorAddr, (v) => {
+  if (v < 0) motorAddr.value = 0;
+  if (v > 255) motorAddr.value = 255;
+});
+
+function addrHex(): string {
+  return motorAddr.value.toString(16).padStart(2, "0");
+}
 
 async function sendHexCmd(hex: string) {
   const clean = hex.replace(/\s+/g, "");
@@ -78,14 +88,12 @@ function setPosition() {
   const buf = new ArrayBuffer(4);
   new DataView(buf).setInt32(0, pos, false);
   const data = Array.from(new Uint8Array(buf));
-  // Modbus: addr=01, func=10 (write multiple), reg=00 02, count=00 02, bytes=04, data
-  const frame = [0x01, 0x10, 0x00, 0x02, 0x00, 0x02, 0x04, ...data];
+  const frame = [motorAddr.value, 0x10, 0x00, 0x02, 0x00, 0x02, 0x04, ...data];
   sendHexCmd(frame.map(b => b.toString(16).padStart(2, "0")).join(" "));
 }
 
 function readPosition() {
-  // Modbus: addr=01, func=03 (read holding), reg=00 02, count=00 02
-  sendHexCmd("01 03 00 02 00 02");
+  sendHexCmd(`${addrHex()} 03 00 02 00 02`);
 }
 
 function setSpeed() {
@@ -94,7 +102,7 @@ function setSpeed() {
   const buf = new ArrayBuffer(4);
   new DataView(buf).setInt32(0, speed, false);
   const data = Array.from(new Uint8Array(buf));
-  const frame = [0x01, 0x10, 0x00, 0x04, 0x00, 0x02, 0x04, ...data];
+  const frame = [motorAddr.value, 0x10, 0x00, 0x04, 0x00, 0x02, 0x04, ...data];
   sendHexCmd(frame.map(b => b.toString(16).padStart(2, "0")).join(" "));
 }
 
@@ -325,26 +333,43 @@ onUnmounted(() => {
         <div class="w-[340px] shrink-0 flex flex-col gap-3">
           <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-              <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">协议指令</span>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">协议指令</span>
+                <div class="flex items-center gap-1.5">
+                  <label class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500">电机地址</label>
+                  <div class="flex items-stretch">
+                    <input
+                      v-model.number="motorAddr"
+                      type="number" min="0" max="255"
+                      :disabled="isOpen"
+                      class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono"
+                      title="电机地址 0x00-0xFF" />
+                    <button @click="motorAddr = Math.min(255, motorAddr + 1)" :disabled="isOpen"
+                      class="px-2 text-sm font-medium border-y border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">+</button>
+                    <button @click="motorAddr = Math.max(0, motorAddr - 1)" :disabled="isOpen"
+                      class="px-2 text-sm font-medium rounded-r-md border-y border-r border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">−</button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="p-3 space-y-3">
+            <div class="px-3 pb-3 space-y-3">
               <!-- 电机控制 -->
               <div>
                 <label class="block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 mb-2">电机控制</label>
                 <div class="grid grid-cols-2 gap-1.5">
-                  <button @click="sendHexCmd('01 06 00 00 00 01')" :disabled="!isOpen"
+                  <button @click="sendHexCmd(`${addrHex()} 06 00 00 00 01`)" :disabled="!isOpen"
                     class="px-2 py-1.5 text-xs font-medium rounded border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 disabled:opacity-40 transition-colors">
                     使能
                   </button>
-                  <button @click="sendHexCmd('01 06 00 00 00 00')" :disabled="!isOpen"
+                  <button @click="sendHexCmd(`${addrHex()} 06 00 00 00 00`)" :disabled="!isOpen"
                     class="px-2 py-1.5 text-xs font-medium rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 disabled:opacity-40 transition-colors">
                     失能
                   </button>
-                  <button @click="sendHexCmd('01 06 00 01 00 01')" :disabled="!isOpen"
+                  <button @click="sendHexCmd(`${addrHex()} 06 00 01 00 01`)" :disabled="!isOpen"
                     class="px-2 py-1.5 text-xs font-medium rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 disabled:opacity-40 transition-colors">
                     启动
                   </button>
-                  <button @click="sendHexCmd('01 06 00 01 00 00')" :disabled="!isOpen"
+                  <button @click="sendHexCmd(`${addrHex()} 06 00 01 00 00`)" :disabled="!isOpen"
                     class="px-2 py-1.5 text-xs font-medium rounded border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900 disabled:opacity-40 transition-colors">
                     停止
                   </button>
@@ -475,6 +500,16 @@ onUnmounted(() => {
 </template>
 
 <style>
+/* 隐藏 number input 原生调节按钮 */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spin {
+  -moz-appearance: textfield;
+}
+
 /* 自定义 select 下拉箭头 — 亮/暗自适应 */
 .select-arrow {
   appearance: none;
