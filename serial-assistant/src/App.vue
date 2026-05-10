@@ -137,9 +137,9 @@ function parseSysParams(raw: number[]): boolean {
     realPos:         parseInt32BE(p, 24).toString(),
     posError:        parseInt32BE(p, 28).toString(),
     pulseCount:      parseInt32BE(p, 32).toString(),
-    enableFlag:      p[37] === 1 ? "已使能" : "未使能",
+    enableFlag:      p[36] === 0 ? "已使能" : "未使能",
     inPosFlag:       p[38] === 1 ? "已到位" : "未到位",
-    stallFlag:       p[39] === 1 ? "已堵转" : "未堵转",
+    stallFlag:       p[37] === 1 ? "已堵转" : "未堵转",
   };
   return true;
 }
