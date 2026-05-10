@@ -31,8 +31,8 @@ const receivedData = ref<number[]>([]);
 const dataViewer = ref<HTMLDivElement>();
 
 // ---- 发送 ----
-const sendText = ref("");
-const sendHex = ref("");
+const sendMode = ref<"text" | "hex">("text");
+const sendData = ref("");
 
 let unlisten: UnlistenFn | null = null;
 
@@ -88,29 +88,24 @@ async function closeSerial() {
 }
 
 // ---- 发送 ----
-async function sendAsText() {
-  if (!sendText.value) return;
-  try {
-    const encoder = new TextEncoder();
-    const data = Array.from(encoder.encode(sendText.value));
-    await invoke("send_serial", { data });
-  } catch (error) {
-    errorMsg.value = error as string;
-  }
-}
-
-async function sendAsHex() {
-  if (!sendHex.value) return;
-  try {
-    const hex = sendHex.value.replace(/\s+/g, "");
+async function send() {
+  if (!sendData.value) return;
+  let data: number[];
+  if (sendMode.value === "hex") {
+    const hex = sendData.value.replace(/\s+/g, "");
     if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
       errorMsg.value = "HEX 格式错误";
       return;
     }
-    const data: number[] = [];
+    data = [];
     for (let i = 0; i < hex.length; i += 2) {
       data.push(parseInt(hex.substring(i, i + 2), 16));
     }
+  } else {
+    const encoder = new TextEncoder();
+    data = Array.from(encoder.encode(sendData.value));
+  }
+  try {
     await invoke("send_serial", { data });
   } catch (error) {
     errorMsg.value = error as string;
@@ -284,30 +279,34 @@ onUnmounted(() => {
       </div>
 
       <!-- 发送区域 -->
-      <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div class="flex flex-col gap-3.5">
-          <div>
-            <label class="block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 mb-1.5">文本发送</label>
-            <div class="flex gap-2">
-              <input v-model="sendText" placeholder="输入要发送的文本..." @keyup.enter="sendAsText"
-                class="flex-1 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono transition-colors" />
-              <button @click="sendAsText" :disabled="!isOpen"
-                class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
-                发送
-              </button>
-            </div>
+      <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+          <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">发送数据</span>
+          <div class="flex items-center gap-1.5">
+            <button
+              :class="sendMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+              @click="sendMode = 'text'"
+              class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+              文本
+            </button>
+            <button
+              :class="sendMode === 'hex' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+              @click="sendMode = 'hex'"
+              class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+              HEX
+            </button>
           </div>
-          <div>
-            <label class="block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 mb-1.5">HEX 发送</label>
-            <div class="flex gap-2">
-              <input v-model="sendHex" placeholder="例如: AA BB CC 0D 0A"
-                class="flex-1 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono transition-colors" />
-              <button @click="sendAsHex" :disabled="!isOpen"
-                class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
-                发送
-              </button>
-            </div>
-          </div>
+        </div>
+        <div class="flex gap-2 p-4">
+          <input
+            v-model="sendData"
+            :placeholder="sendMode === 'hex' ? '例如: AA BB CC 0D 0A' : '输入要发送的文本...'"
+            @keyup.enter="send"
+            class="flex-1 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono transition-colors" />
+          <button @click="send" :disabled="!isOpen"
+            class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
+            发送
+          </button>
         </div>
       </div>
 
