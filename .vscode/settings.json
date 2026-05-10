@@ -1,4 +1,7 @@
 {
     "workbench.colorTheme": "Dark 2026",
-    "workbench.iconTheme": "vs-minimal"
+    "workbench.iconTheme": "vs-minimal",
+    "rust-analyzer.linkedProjects": [
+        "serial-assistant/src-tauri/Cargo.toml"
+    ]
 }
