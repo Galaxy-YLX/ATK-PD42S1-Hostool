@@ -50,6 +50,7 @@ function totalBytes(): number {
 // ---- 发送 ----
 const sendMode = ref<"text" | "hex">("hex");
 const sendData = ref("");
+	const sendHistory = ref<{ mode: "text" | "hex"; data: string }[]>([]);
 
 // ---- 页面切换 ----
 const currentPage = ref("设备设置");
@@ -252,11 +253,21 @@ async function send() {
   try {
     await invoke("send_serial", { data });
     recordSend(data);
+    sendHistory.value.push({ mode: sendMode.value, data: sendData.value });
+    if (sendHistory.value.length > 500) sendHistory.value = sendHistory.value.slice(-300);
   } catch (error) {
     errorMsg.value = error as string;
   }
 }
 
+
+	function removeSendHistory(index: number) {
+	  sendHistory.value.splice(index, 1);
+	}
+
+	function clearSendHistory() {
+	  sendHistory.value = [];
+	}
 // ---- 数据显示格式化 ----
 function bytesToHex(bytes: number[]): string {
   return bytes.map(b => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
@@ -586,6 +597,37 @@ onUnmounted(() => {
                 class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
                 发送
               </button>
+            </div>
+          </div>
+
+          <!-- 发送历史 -->
+          <div v-if="sendHistory.length > 0" class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+              <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">发送历史</span>
+              <button @click="clearSendHistory"
+                class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                清空全部
+              </button>
+            </div>
+            <div class="max-h-48 overflow-y-auto">
+              <div
+                v-for="(item, i) in sendHistory"
+                :key="i"
+                class="flex items-center gap-2 px-4 py-1.5 border-b border-gray-50 dark:border-gray-900 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors group"
+              >
+                <span class="text-[10px] font-medium text-gray-400 dark:text-gray-600 w-8 shrink-0">{{ item.mode === 'hex' ? 'HEX' : '文本' }}</span>
+                <button
+                  @click="sendData = item.data; sendMode = item.mode"
+                  class="flex-1 text-left text-xs font-mono text-gray-700 dark:text-gray-300 truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  :title="item.data">
+                  {{ item.data }}
+                </button>
+                <button
+                  @click="removeSendHistory(i)"
+                  class="shrink-0 px-1 text-sm text-gray-300 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  ×
+                </button>
+              </div>
             </div>
           </div>
         </div>
