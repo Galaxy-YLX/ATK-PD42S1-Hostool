@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
@@ -22,8 +22,14 @@ const errorMsg = ref("");
 
 const baudRates = [9600, 14400, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 
+interface DataEntry {
+  timestamp: number;
+  direction: "tx" | "rx";
+  data: number[];
+}
+
 const displayMode = ref<"text" | "hex">("text");
-const receivedData = ref<number[]>([]);
+const dataEntries = ref<DataEntry[]>([]);
 const dataViewer = ref<HTMLDivElement>();
 
 const sendMode = ref<"text" | "hex">("text");
@@ -31,9 +37,29 @@ const sendData = ref("");
 
 let unlisten: UnlistenFn | null = null;
 
+const rxBytes = computed(() =>
+  dataEntries.value
+    .filter((e) => e.direction === "rx")
+    .reduce((sum, e) => sum + e.data.length, 0)
+);
+const txBytes = computed(() =>
+  dataEntries.value
+    .filter((e) => e.direction === "tx")
+    .reduce((sum, e) => sum + e.data.length, 0)
+);
+
 watch([isOpen, selectedPort], ([open, port]) => {
   emit("connection-changed", { isOpen: open, portName: open ? port : "" });
 });
+
+function padTime(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+
+function formatTimestamp(ts: number): string {
+  const d = new Date(ts);
+  return `${padTime(d.getHours())}:${padTime(d.getMinutes())}:${padTime(d.getSeconds())}.${d.getMilliseconds().toString().padStart(3, "0")}`;
+}
 
 async function fetchPorts(silent = false) {
   try {
@@ -71,7 +97,7 @@ async function openSerial() {
     });
     isOpen.value = true;
     errorMsg.value = "";
-    receivedData.value = [];
+    dataEntries.value = [];
   } catch (error) {
     errorMsg.value = error as string;
   }
@@ -105,18 +131,21 @@ async function send() {
   }
   try {
     await invoke("send_serial", { portId: props.tabId, data });
+    dataEntries.value.push({ timestamp: Date.now(), direction: "tx", data });
+    trimData();
+    scrollToBottom();
   } catch (error) {
     errorMsg.value = error as string;
   }
 }
 
-function formatDisplay(): string {
+function formatEntryData(entry: DataEntry): string {
   if (displayMode.value === "hex") {
-    return receivedData.value
+    return entry.data
       .map((b) => b.toString(16).toUpperCase().padStart(2, "0"))
       .join(" ");
   }
-  return receivedData.value
+  return entry.data
     .map((b) => {
       if (b >= 0x20 && b < 0x7f) return String.fromCharCode(b);
       if (b === 0x0a) return "\n";
@@ -128,7 +157,22 @@ function formatDisplay(): string {
 }
 
 function clearData() {
-  receivedData.value = [];
+  dataEntries.value = [];
+}
+
+function trimData() {
+  const total = dataEntries.value.reduce((s, e) => s + e.data.length, 0);
+  if (total > 100000) {
+    let cut = 0;
+    const target = 50000;
+    const kept: DataEntry[] = [];
+    for (let i = dataEntries.value.length - 1; i >= 0; i--) {
+      kept.unshift(dataEntries.value[i]);
+      cut += dataEntries.value[i].data.length;
+      if (cut >= target) break;
+    }
+    dataEntries.value = kept;
+  }
 }
 
 function scrollToBottom() {
@@ -142,10 +186,8 @@ function scrollToBottom() {
 onMounted(async () => {
   await fetchPorts(true);
   unlisten = await listen<number[]>(`serial-data:${props.tabId}`, (event) => {
-    receivedData.value.push(...event.payload);
-    if (receivedData.value.length > 100000) {
-      receivedData.value = receivedData.value.slice(-50000);
-    }
+    dataEntries.value.push({ timestamp: Date.now(), direction: "rx", data: event.payload });
+    trimData();
     scrollToBottom();
   });
 });
@@ -231,12 +273,14 @@ onUnmounted(() => {
       </span>
     </div>
 
-    <!-- 数据查看器 -->
+    <!-- 数据收发查看器 -->
     <div class="mb-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
       <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">接收数据</span>
+        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">数据收发</span>
         <div class="flex items-center gap-1.5">
-          <span class="text-[11px] text-gray-400 dark:text-gray-600 mr-2 tabular-nums">{{ receivedData.length }} 字节</span>
+          <span class="text-[11px] text-gray-400 dark:text-gray-600 mr-2 tabular-nums">
+            RX:{{ rxBytes }} TX:{{ txBytes }}
+          </span>
           <button
             :class="displayMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
             @click="displayMode = 'text'"
@@ -256,7 +300,18 @@ onUnmounted(() => {
         </div>
       </div>
       <div ref="dataViewer" class="h-80 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-950 font-mono text-sm leading-relaxed whitespace-pre-wrap break-all">
-        <pre v-if="receivedData.length > 0" class="m-0 text-gray-800 dark:text-gray-200">{{ formatDisplay() }}</pre>
+        <template v-if="dataEntries.length > 0">
+          <div
+            v-for="(entry, idx) in dataEntries"
+            :key="idx"
+            class="mb-0.5"
+            :class="entry.direction === 'tx' ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'"
+          >
+            <span class="text-gray-400 dark:text-gray-600 font-normal">[{{ formatTimestamp(entry.timestamp) }}]</span>
+            <span class="font-semibold ml-1">{{ entry.direction === 'tx' ? 'TX' : 'RX' }}</span>
+            <span class="ml-1 text-gray-800 dark:text-gray-200">{{ formatEntryData(entry) }}</span>
+          </div>
+        </template>
         <div v-else class="text-gray-300 dark:text-gray-700 font-sans text-sm">等待数据...</div>
       </div>
     </div>
