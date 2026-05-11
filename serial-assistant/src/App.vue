@@ -525,10 +525,12 @@ onUnmounted(() => {
 .no-spin::-webkit-outer-spin-button,
 .no-spin::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 .no-spin {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* 自定义 select 下拉箭头 — 亮/暗自适应 */
