@@ -60,6 +60,20 @@ watch(motorAddr, (v) => {
   if (v > 255) motorAddr.value = 255;
 });
 
+	const newMotorAddr = ref(1);
+
+	function sendSetAddrCmd() {
+	  const addr = (newMotorAddr.value >= 1 && newMotorAddr.value <= 255) ? newMotorAddr.value : 1;
+	  newMotorAddr.value = addr;
+	  const frame = customFrame(motorAddr.value, 0x60, [addr]);
+	  invoke("send_serial", { data: frame }).then(() => {
+	    recordSend(frame);
+	    motorAddr.value = addr;
+	  }).catch((e) => {
+	    errorMsg.value = e as string;
+	  });
+	}
+
 // ---- 系统参数 ----
 const pendingSysRead = ref(false);
 const sysParams = ref({
@@ -390,6 +404,28 @@ onUnmounted(() => {
               </div>
             </div>
             <div class="px-3 pb-3">
+              <div class="border-t border-gray-100 dark:border-gray-800 pt-3 mt-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-medium text-gray-600 dark:text-gray-400">设置电机地址</span>
+                  <div class="flex items-center gap-1.5">
+                    <div class="flex items-stretch">
+                      <input
+                        v-model.number="newMotorAddr"
+                        type="number" min="1" max="255"
+                        class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none font-mono"
+                        title="新地址 0x01-0xFF" />
+                      <button @click="newMotorAddr = Math.min(255, newMotorAddr + 1)"
+                        class="px-2 text-sm font-medium border-y border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">+</button>
+                      <button @click="newMotorAddr = Math.max(0, newMotorAddr - 1)"
+                        class="px-2 text-sm font-medium rounded-r-md border-y border-r border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">−</button>
+                    </div>
+                    <button @click="sendSetAddrCmd" :disabled="!isOpen"
+                      class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
+                      设置
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
