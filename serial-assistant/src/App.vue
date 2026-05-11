@@ -23,20 +23,21 @@ const errorMsg = ref("");
 const baudRates = [9600, 14400, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 
 // ---- 数据显示 ----
-interface DataEntry { dir: "send" | "recv"; data: number[] }
+	interface DataEntry { dir: "send" | "recv"; data: number[]; time: number }
 const displayMode = ref<"text" | "hex">("hex");
 const dataEntries = ref<DataEntry[]>([]);
+	const showTimestamp = ref(false);
 const dataViewer = ref<HTMLDivElement>();
 
 function recordSend(bytes: number[]) {
-  dataEntries.value.push({ dir: "send", data: bytes });
+  dataEntries.value.push({ dir: "send", data: bytes, time: Date.now() });
   if (dataEntries.value.length > 100000) {
     dataEntries.value = dataEntries.value.slice(-50000);
   }
 }
 
 function recordRecv(bytes: number[]) {
-  dataEntries.value.push({ dir: "recv", data: bytes });
+  dataEntries.value.push({ dir: "recv", data: bytes, time: Date.now() });
   if (dataEntries.value.length > 100000) {
     dataEntries.value = dataEntries.value.slice(-50000);
   }
@@ -527,6 +528,12 @@ onUnmounted(() => {
                   @click="displayMode = 'hex'"
                   class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
                   HEX
+                </button>
+                <button
+                  :class="showTimestamp ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                  @click="showTimestamp = !showTimestamp"
+                  class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+                  时间
                 </button>
                 <button @click="clearData"
                   class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
