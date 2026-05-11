@@ -74,6 +74,24 @@ watch(motorAddr, (v) => {
 	  });
 	}
 
+
+	function sendMotorEnable() {
+	  const frame = customFrame(motorAddr.value, 0xFA, [0]);
+	  invoke("send_serial", { data: frame }).then(() => {
+	    recordSend(frame);
+	  }).catch((e) => {
+	    errorMsg.value = e as string;
+	  });
+	}
+
+	function sendMotorDisable() {
+	  const frame = customFrame(motorAddr.value, 0xFA, [1]);
+	  invoke("send_serial", { data: frame }).then(() => {
+	    recordSend(frame);
+	  }).catch((e) => {
+	    errorMsg.value = e as string;
+	  });
+	}
 // ---- 系统参数 ----
 const pendingSysRead = ref(false);
 const sysParams = ref({
@@ -404,7 +422,7 @@ onUnmounted(() => {
               </div>
             </div>
             <div class="px-3 pb-3">
-              <div class="border-t border-gray-100 dark:border-gray-800 pt-3 mt-1">
+              <div class="pt-3">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-medium text-gray-600 dark:text-gray-400">设置电机地址</span>
                   <div class="flex items-center gap-1.5">
@@ -412,11 +430,12 @@ onUnmounted(() => {
                       <input
                         v-model.number="newMotorAddr"
                         type="number" min="1" max="255"
+                        @blur="if (!newMotorAddr || newMotorAddr < 1) newMotorAddr = 1; if (newMotorAddr > 255) newMotorAddr = 255"
                         class="no-spin w-14 px-1 py-1 text-xs text-center rounded-l-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none font-mono"
                         title="新地址 0x01-0xFF" />
                       <button @click="newMotorAddr = Math.min(255, newMotorAddr + 1)"
                         class="px-2 text-sm font-medium border-y border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">+</button>
-                      <button @click="newMotorAddr = Math.max(0, newMotorAddr - 1)"
+                      <button @click="newMotorAddr = Math.max(1, newMotorAddr - 1)"
                         class="px-2 text-sm font-medium rounded-r-md border-y border-r border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">−</button>
                     </div>
                     <button @click="sendSetAddrCmd" :disabled="!isOpen"
@@ -448,8 +467,17 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <div class="p-3 space-y-3 text-xs text-gray-500 dark:text-gray-400">
-              <div>运动控制页面（待实现）</div>
+            <div class="p-3 space-y-3">
+              <div class="flex gap-2">
+                <button @click="sendMotorEnable" :disabled="!isOpen"
+                  class="flex-1 px-3 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
+                  使能
+                </button>
+                <button @click="sendMotorDisable" :disabled="!isOpen"
+                  class="flex-1 px-3 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
+                  失能
+                </button>
+              </div>
             </div>
           </div>
 
