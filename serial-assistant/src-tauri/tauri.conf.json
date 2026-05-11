@@ -12,9 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "serial-assistant",
+        "title": "串口助手",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "visible": false
       }
     ],
     "security": {
