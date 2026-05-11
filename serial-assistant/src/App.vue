@@ -570,6 +570,10 @@ onUnmounted(() => {
                   class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
                   HEX
                 </button>
+                <button @click="sendData = ''"
+                  class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  清空
+                </button>
               </div>
             </div>
             <div class="flex gap-2 p-4">
