@@ -33,7 +33,8 @@ const taskList = ref<TaskItem[]>([]);
 const queueStatus = ref<QueueStatus>("Idle");
 const currentIndex = ref<number | null>(null);
 const editingIndex = ref<number | null>(null);
-const isExpanded = ref(true);
+const dragIdx = ref<number | null>(null);
+const dragOverIdx = ref<number | null>(null);
 
 let unlistenQueue: UnlistenFn | null = null;
 
@@ -67,6 +68,22 @@ watch(() => props.isPortOpen, (open) => {
     invoke("queue_stop", { portId: props.tabId }).catch(() => {});
     queueStatus.value = "Idle";
     currentIndex.value = null;
+  }
+});
+
+function handleDocumentClick(e: MouseEvent) {
+  if (editingIndex.value === null) return;
+  const target = e.target as HTMLElement;
+  if (!target.closest(".task-editor")) {
+    editingIndex.value = null;
+  }
+}
+
+watch(editingIndex, (val) => {
+  if (val !== null) {
+    document.addEventListener("click", handleDocumentClick, true);
+  } else {
+    document.removeEventListener("click", handleDocumentClick, true);
   }
 });
 
@@ -155,6 +172,57 @@ function moveTask(idx: number, dir: number) {
 
 function renumber() {
   taskList.value.forEach((t, i) => (t.index = i));
+}
+
+function onDragStart(idx: number, e: DragEvent) {
+  if (!canEdit.value) return;
+  dragIdx.value = idx;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(idx));
+  }
+}
+
+function onDragOver(idx: number, e: DragEvent) {
+  if (!canEdit.value || dragIdx.value === null) return;
+  e.preventDefault();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = "move";
+  }
+  dragOverIdx.value = idx;
+}
+
+function onDragLeave() {
+  dragOverIdx.value = null;
+}
+
+function onDrop(idx: number) {
+  if (!canEdit.value || dragIdx.value === null) return;
+  const from = dragIdx.value;
+  if (from === idx) {
+    dragIdx.value = null;
+    dragOverIdx.value = null;
+    return;
+  }
+  const item = taskList.value.splice(from, 1)[0];
+  taskList.value.splice(idx, 0, item);
+  if (editingIndex.value === from) {
+    editingIndex.value = idx;
+  } else if (editingIndex.value !== null) {
+    if (from < idx && editingIndex.value > from && editingIndex.value <= idx) {
+      editingIndex.value--;
+    } else if (from > idx && editingIndex.value >= idx && editingIndex.value < from) {
+      editingIndex.value++;
+    }
+  }
+  dragIdx.value = null;
+  dragOverIdx.value = null;
+  renumber();
+}
+
+function onDragEnd() {
+  dragIdx.value = null;
+  dragOverIdx.value = null;
 }
 
 function clearAll() {
@@ -295,6 +363,7 @@ onUnmounted(() => {
     invoke("queue_stop", { portId: props.tabId }).catch(() => {});
   }
   if (unlistenQueue) unlistenQueue();
+  document.removeEventListener("click", handleDocumentClick, true);
 });
 </script>
 
@@ -302,8 +371,7 @@ onUnmounted(() => {
   <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
     <!-- Header -->
     <div
-      class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 cursor-pointer select-none"
-      @click="isExpanded = !isExpanded"
+      class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
     >
       <div class="flex items-center gap-2">
         <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">任务队列</span>
@@ -315,10 +383,9 @@ onUnmounted(() => {
           任务 {{ currentIndex + 1 }}/{{ taskList.length }}
         </span>
       </div>
-      <span class="text-gray-400 dark:text-gray-600 text-sm transition-transform" :class="isExpanded ? 'rotate-180' : ''">&#9660;</span>
     </div>
 
-    <div v-show="isExpanded">
+    <div>
       <!-- Control Bar -->
       <div class="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
         <button
@@ -363,11 +430,25 @@ onUnmounted(() => {
             :key="idx"
             :class="[
               'border-b border-gray-50 dark:border-gray-900 last:border-b-0 transition-colors',
-              currentIndex === idx ? 'bg-blue-50 dark:bg-blue-950' : ''
+              currentIndex === idx ? 'bg-blue-50 dark:bg-blue-950' : '',
+              dragOverIdx === idx && dragIdx !== idx ? 'border-t-2 border-t-blue-500 dark:border-t-blue-400' : ''
             ]"
+            @dragover="onDragOver(idx, $event)"
+            @dragleave="onDragLeave"
+            @drop="onDrop(idx)"
           >
             <!-- Task Row -->
-            <div class="flex items-center gap-2 px-4 py-2 text-sm group">
+            <div
+              :draggable="canEdit"
+              :class="[
+                'flex items-center gap-2 px-4 py-2 text-sm group transition-opacity',
+                dragIdx === idx ? 'opacity-40' : '',
+                canEdit ? 'cursor-grab active:cursor-grabbing' : ''
+              ]"
+              @dragstart="onDragStart(idx, $event)"
+              @dragend="onDragEnd"
+            >
+              <span class="text-gray-300 dark:text-gray-700 text-xs shrink-0 select-none" :class="canEdit ? 'visible' : 'invisible'">&#x2630;</span>
               <span class="text-gray-400 dark:text-gray-600 text-xs w-6 shrink-0 tabular-nums">{{ task.index }}</span>
               <span
                 :class="typeBadgeClass(task.task_type)"
@@ -417,7 +498,7 @@ onUnmounted(() => {
             <!-- Inline Editor -->
             <div
               v-if="editingIndex === idx"
-              class="px-4 pb-3 pt-1 ml-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 rounded-b"
+              class="task-editor px-4 pb-3 pt-1 ml-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 rounded-b"
             >
               <!-- Send editor -->
               <div v-if="task.task_type.type === 'Send'" class="flex flex-col gap-2">
