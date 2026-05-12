@@ -268,6 +268,30 @@ async function send() {
 	function clearSendHistory() {
 	  sendHistory.value = [];
 	}
+
+	async function sendHistoryItem(item: { mode: "text" | "hex"; data: string }) {
+	  let data: number[];
+	  if (item.mode === "hex") {
+	    const hex = item.data.replace(/\s+/g, "");
+	    if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
+	      errorMsg.value = "HEX 格式错误";
+	      return;
+	    }
+	    data = [];
+	    for (let i = 0; i < hex.length; i += 2) {
+	      data.push(parseInt(hex.substring(i, i + 2), 16));
+	    }
+	  } else {
+	    const encoder = new TextEncoder();
+	    data = Array.from(encoder.encode(item.data));
+	  }
+	  try {
+	    await invoke("send_serial", { data });
+	    recordSend(data);
+	  } catch (error) {
+	    errorMsg.value = error as string;
+	  }
+	}
 // ---- 数据显示格式化 ----
 function bytesToHex(bytes: number[]): string {
   return bytes.map(b => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
@@ -621,6 +645,12 @@ onUnmounted(() => {
                   class="flex-1 text-left text-xs font-mono text-gray-700 dark:text-gray-300 truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                   :title="item.data">
                   {{ item.data }}
+                </button>
+                <button
+                  @click="sendHistoryItem(item)"
+                  class="shrink-0 px-1 text-sm text-gray-300 dark:text-gray-700 hover:text-blue-500 dark:hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="发送此条数据">
+                  ↑
                 </button>
                 <button
                   @click="removeSendHistory(i)"
