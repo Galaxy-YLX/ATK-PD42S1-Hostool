@@ -47,6 +47,9 @@ const txBytes = computed(() =>
     .filter((e) => e.direction === "tx")
     .reduce((sum, e) => sum + e.data.length, 0)
 );
+const txHistory = computed(() =>
+  dataEntries.value.filter((e) => e.direction === "tx")
+);
 
 watch([isOpen, selectedPort], ([open, port]) => {
   emit("connection-changed", { isOpen: open, portName: open ? port : "" });
@@ -158,6 +161,25 @@ function formatEntryData(entry: DataEntry): string {
 
 function clearData() {
   dataEntries.value = [];
+}
+
+function removeHistoryEntry(ts: number) {
+  const idx = dataEntries.value.findIndex((e) => e.timestamp === ts);
+  if (idx !== -1) dataEntries.value.splice(idx, 1);
+}
+
+async function resendHistoryEntry(entry: DataEntry) {
+  try {
+    await invoke("send_serial", { portId: props.tabId, data: entry.data });
+    dataEntries.value.push({ timestamp: Date.now(), direction: "tx", data: entry.data });
+    trimData();
+  } catch (error) {
+    errorMsg.value = error as string;
+  }
+}
+
+function clearTxHistory() {
+  dataEntries.value = dataEntries.value.filter((e) => e.direction !== "tx");
 }
 
 function trimData() {
@@ -345,6 +367,40 @@ onUnmounted(() => {
           class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
           发送
         </button>
+      </div>
+    </div>
+
+    <!-- 发送历史 -->
+    <div class="mt-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">发送历史</span>
+        <button @click="clearTxHistory"
+          class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          清空
+        </button>
+      </div>
+      <div class="max-h-40 overflow-y-auto">
+        <template v-if="txHistory.length > 0">
+          <div
+            v-for="entry in [...txHistory].reverse()"
+            :key="entry.timestamp"
+            class="flex items-center gap-1.5 mx-2 my-0.5 px-2 py-1 rounded text-sm font-mono hover:bg-gray-50 dark:hover:bg-gray-950 transition-colors"
+          >
+            <span class="text-gray-400 dark:text-gray-600 text-xs shrink-0">[{{ formatTimestamp(entry.timestamp) }}]</span>
+            <span class="flex-1 truncate text-gray-700 dark:text-gray-300">{{ formatEntryData(entry) }}</span>
+            <button @click="resendHistoryEntry(entry)" :disabled="!isOpen"
+              class="shrink-0 px-2 py-0.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors"
+              title="重新发送">
+              发送
+            </button>
+            <button @click="removeHistoryEntry(entry.timestamp)"
+              class="shrink-0 px-1.5 py-0.5 text-sm text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+              title="删除记录">
+              &times;
+            </button>
+          </div>
+        </template>
+        <div v-else class="px-4 py-6 text-center text-gray-300 dark:text-gray-700 font-sans text-sm">暂无发送历史</div>
       </div>
     </div>
   </div>
