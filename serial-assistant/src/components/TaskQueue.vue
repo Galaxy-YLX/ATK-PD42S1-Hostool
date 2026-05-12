@@ -522,48 +522,52 @@ onUnmounted(() => {
               </div>
 
               <!-- Delay editor -->
-              <div v-if="task.task_type.type === 'Delay'" class="flex items-center gap-2">
+              <div v-if="task.task_type.type === 'Delay'" class="flex items-center gap-1.5">
                 <input
                   v-model.number="editDelayMs"
-                  type="number"
-                  min="0"
-                  step="10"
-                  class="w-28 px-2.5 py-1.5 text-sm font-mono rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                  type="text"
+                  class="w-20 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
                 />
+                <button @click="editDelayMs = Math.max(0, editDelayMs - 10)"
+                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                >-</button>
+                <button @click="editDelayMs = editDelayMs + 10"
+                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                >+</button>
                 <span class="text-xs text-gray-500 dark:text-gray-400">毫秒</span>
               </div>
 
               <!-- Jump editor -->
-              <div v-if="task.task_type.type === 'Jump'" class="flex items-center gap-2">
+              <div v-if="task.task_type.type === 'Jump'" class="flex items-center gap-1.5">
                 <span class="text-xs text-gray-500 dark:text-gray-400">转到任务 #</span>
                 <input
                   v-model.number="editJumpTarget"
-                  type="number"
-                  min="0"
-                  :max="taskList.length - 1"
-                  class="w-20 px-2.5 py-1.5 text-sm font-mono rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                  type="text"
+                  class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
                 />
+                <button @click="editJumpTarget = Math.max(0, editJumpTarget - 1)"
+                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                >-</button>
+                <button @click="editJumpTarget = Math.min(taskList.length - 1, editJumpTarget + 1)"
+                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                >+</button>
               </div>
 
               <!-- LoopStart editor -->
-              <div v-if="task.task_type.type === 'LoopStart'" class="flex items-center gap-2">
+              <div v-if="task.task_type.type === 'LoopStart'" class="flex items-center gap-1.5">
                 <span class="text-xs text-gray-500 dark:text-gray-400">重复</span>
                 <input
                   v-model.number="editLoopCount"
-                  type="number"
-                  min="1"
-                  class="w-20 px-2.5 py-1.5 text-sm font-mono rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                  type="text"
+                  class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
                 />
+                <button @click="editLoopCount = Math.max(1, editLoopCount - 1)"
+                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                >-</button>
+                <button @click="editLoopCount = editLoopCount + 1"
+                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                >+</button>
                 <span class="text-xs text-gray-500 dark:text-gray-400">次</span>
-              </div>
-
-              <!-- Label field (all types) -->
-              <div class="flex items-center gap-2 mt-2">
-                <input
-                  v-model="editLabel"
-                  placeholder="标签（可选）"
-                  class="flex-1 px-2.5 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
-                />
               </div>
 
               <!-- Save/Cancel -->
