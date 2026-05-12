@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import TaskQueue from "./TaskQueue.vue";
 
 const props = defineProps<{
   tabId: string;
@@ -295,112 +296,123 @@ onUnmounted(() => {
       </span>
     </div>
 
-    <!-- 数据收发查看器 -->
-    <div class="mb-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
-      <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">数据收发</span>
-        <div class="flex items-center gap-1.5">
-          <span class="text-[11px] text-gray-400 dark:text-gray-600 mr-2 tabular-nums">
-            RX:{{ rxBytes }} TX:{{ txBytes }}
-          </span>
-          <button
-            :class="displayMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
-            @click="displayMode = 'text'"
-            class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
-            文本
-          </button>
-          <button
-            :class="displayMode === 'hex' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
-            @click="displayMode = 'hex'"
-            class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
-            HEX
-          </button>
-          <button @click="clearData"
-            class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            清空
-          </button>
-        </div>
+    <!-- 任务队列 + 右侧内容区并排 -->
+    <div class="flex gap-3 mb-3">
+      <!-- 任务队列（左侧） -->
+      <div class="w-[340px] shrink-0">
+        <TaskQueue :tab-id="tabId" :is-port-open="isOpen" />
       </div>
-      <div ref="dataViewer" class="h-80 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-950 font-mono text-sm leading-relaxed whitespace-pre-wrap break-all">
-        <template v-if="dataEntries.length > 0">
-          <div
-            v-for="(entry, idx) in dataEntries"
-            :key="idx"
-            class="mb-0.5"
-            :class="entry.direction === 'tx' ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'"
-          >
-            <span class="text-gray-400 dark:text-gray-600 font-normal">[{{ formatTimestamp(entry.timestamp) }}]</span>
-            <span class="font-semibold ml-1">{{ entry.direction === 'tx' ? 'TX' : 'RX' }}</span>
-            <span class="ml-1 text-gray-800 dark:text-gray-200">{{ formatEntryData(entry) }}</span>
+
+      <!-- 右侧：数据收发 + 发送区域 + 发送历史 -->
+      <div class="flex-1 min-w-0 flex flex-col gap-3">
+        <!-- 数据收发查看器 -->
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">数据收发</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] text-gray-400 dark:text-gray-600 mr-2 tabular-nums">
+                RX:{{ rxBytes }} TX:{{ txBytes }}
+              </span>
+              <button
+                :class="displayMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                @click="displayMode = 'text'"
+                class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+                文本
+              </button>
+              <button
+                :class="displayMode === 'hex' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                @click="displayMode = 'hex'"
+                class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+                HEX
+              </button>
+              <button @click="clearData"
+                class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                清空
+              </button>
+            </div>
           </div>
-        </template>
-        <div v-else class="text-gray-300 dark:text-gray-700 font-sans text-sm">等待数据...</div>
-      </div>
-    </div>
-
-    <!-- 发送区域 -->
-    <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
-      <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">发送数据</span>
-        <div class="flex items-center gap-1.5">
-          <button
-            :class="sendMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
-            @click="sendMode = 'text'"
-            class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
-            文本
-          </button>
-          <button
-            :class="sendMode === 'hex' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
-            @click="sendMode = 'hex'"
-            class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
-            HEX
-          </button>
+          <div ref="dataViewer" class="h-80 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-950 font-mono text-sm leading-relaxed whitespace-pre-wrap break-all">
+            <template v-if="dataEntries.length > 0">
+              <div
+                v-for="(entry, idx) in dataEntries"
+                :key="idx"
+                class="mb-0.5"
+                :class="entry.direction === 'tx' ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'"
+              >
+                <span class="text-gray-400 dark:text-gray-600 font-normal">[{{ formatTimestamp(entry.timestamp) }}]</span>
+                <span class="font-semibold ml-1">{{ entry.direction === 'tx' ? 'TX' : 'RX' }}</span>
+                <span class="ml-1 text-gray-800 dark:text-gray-200">{{ formatEntryData(entry) }}</span>
+              </div>
+            </template>
+            <div v-else class="text-gray-300 dark:text-gray-700 font-sans text-sm">等待数据...</div>
+          </div>
         </div>
-      </div>
-      <div class="flex gap-2 p-4">
-        <input
-          v-model="sendData"
-          :placeholder="sendMode === 'hex' ? '例如: AA BB CC 0D 0A' : '输入要发送的文本...'"
-          @keyup.enter="send"
-          class="flex-1 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono transition-colors" />
-        <button @click="send" :disabled="!isOpen"
-          class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
-          发送
-        </button>
-      </div>
-    </div>
 
-    <!-- 发送历史 -->
-    <div class="mt-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
-      <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">发送历史</span>
-        <button @click="clearTxHistory"
-          class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-          清空
-        </button>
-      </div>
-      <div class="max-h-40 overflow-y-auto">
-        <template v-if="txHistory.length > 0">
-          <div
-            v-for="entry in [...txHistory].reverse()"
-            :key="entry.timestamp"
-            class="flex items-center gap-1.5 mx-2 my-0.5 px-2 py-1 rounded text-sm font-mono hover:bg-gray-50 dark:hover:bg-gray-950 transition-colors"
-          >
-            <span class="text-gray-400 dark:text-gray-600 text-xs shrink-0">[{{ formatTimestamp(entry.timestamp) }}]</span>
-            <span class="flex-1 truncate text-gray-700 dark:text-gray-300">{{ formatEntryData(entry) }}</span>
-            <button @click="resendHistoryEntry(entry)" :disabled="!isOpen"
-              class="shrink-0 px-2 py-0.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors"
-              title="重新发送">
+        <!-- 发送区域 -->
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">发送数据</span>
+            <div class="flex items-center gap-1.5">
+              <button
+                :class="sendMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                @click="sendMode = 'text'"
+                class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+                文本
+              </button>
+              <button
+                :class="sendMode === 'hex' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                @click="sendMode = 'hex'"
+                class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+                HEX
+              </button>
+            </div>
+          </div>
+          <div class="flex gap-2 p-4">
+            <input
+              v-model="sendData"
+              :placeholder="sendMode === 'hex' ? '例如: AA BB CC 0D 0A' : '输入要发送的文本...'"
+              @keyup.enter="send"
+              class="flex-1 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono transition-colors" />
+            <button @click="send" :disabled="!isOpen"
+              class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
               发送
             </button>
-            <button @click="removeHistoryEntry(entry.timestamp)"
-              class="shrink-0 px-1.5 py-0.5 text-sm text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-              title="删除记录">
-              &times;
+          </div>
+        </div>
+
+        <!-- 发送历史 -->
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">发送历史</span>
+            <button @click="clearTxHistory"
+              class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              清空
             </button>
           </div>
-        </template>
-        <div v-else class="px-4 py-6 text-center text-gray-300 dark:text-gray-700 font-sans text-sm">暂无发送历史</div>
+          <div class="max-h-40 overflow-y-auto">
+            <template v-if="txHistory.length > 0">
+              <div
+                v-for="entry in [...txHistory].reverse()"
+                :key="entry.timestamp"
+                class="flex items-center gap-1.5 mx-2 my-0.5 px-2 py-1 rounded text-sm font-mono hover:bg-gray-50 dark:hover:bg-gray-950 transition-colors"
+              >
+                <span class="text-gray-400 dark:text-gray-600 text-xs shrink-0">[{{ formatTimestamp(entry.timestamp) }}]</span>
+                <span class="flex-1 truncate text-gray-700 dark:text-gray-300">{{ formatEntryData(entry) }}</span>
+                <button @click="resendHistoryEntry(entry)" :disabled="!isOpen"
+                  class="shrink-0 px-2 py-0.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors"
+                  title="重新发送">
+                  发送
+                </button>
+                <button @click="removeHistoryEntry(entry.timestamp)"
+                  class="shrink-0 px-1.5 py-0.5 text-sm text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                  title="删除记录">
+                  &times;
+                </button>
+              </div>
+            </template>
+            <div v-else class="px-4 py-6 text-center text-gray-300 dark:text-gray-700 font-sans text-sm">暂无发送历史</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
