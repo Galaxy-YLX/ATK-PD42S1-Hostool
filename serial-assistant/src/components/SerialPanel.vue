@@ -299,7 +299,7 @@ onUnmounted(() => {
     <!-- 任务队列 + 右侧内容区并排 -->
     <div class="flex gap-3 mb-3">
       <!-- 任务队列（左侧） -->
-      <div class="w-[340px] shrink-0">
+      <div class="w-[440px] shrink-0">
         <TaskQueue :tab-id="tabId" :is-port-open="isOpen" />
       </div>
 

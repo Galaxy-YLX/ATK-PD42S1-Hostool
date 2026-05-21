@@ -368,7 +368,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+  <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden flex flex-col h-full">
     <!-- Header -->
     <div
       class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
@@ -385,238 +385,241 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div>
-      <!-- Control Bar -->
-      <div class="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
-        <button
-          v-if="isIdle"
-          @click="startQueue"
-          :disabled="!canStart"
-          class="px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors"
-        >
-          启动
-        </button>
-        <button
-          v-if="isRunning"
-          @click="pauseQueue"
-          class="px-4 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 rounded-md transition-colors"
-        >
-          暂停
-        </button>
-        <button
-          v-if="isPaused"
-          @click="resumeQueue"
-          class="px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-md transition-colors"
-        >
-          继续
-        </button>
-        <button
-          v-if="isRunning || isPaused"
-          @click="stopQueue"
-          class="px-4 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-md transition-colors"
-        >
-          停止
-        </button>
-        <span v-if="!canStart && isIdle" class="text-xs text-gray-400 dark:text-gray-600">
-          {{ !props.isPortOpen ? '请先打开串口' : taskList.length === 0 ? '请添加任务' : '' }}
-        </span>
-      </div>
-
-      <!-- Task List -->
-      <div class="max-h-72 overflow-y-auto">
-        <template v-if="taskList.length > 0">
-          <div
-            v-for="(task, idx) in taskList"
-            :key="idx"
-            :class="[
-              'border-b border-gray-50 dark:border-gray-900 last:border-b-0 transition-colors',
-              currentIndex === idx ? 'bg-blue-50 dark:bg-blue-950' : '',
-              dragOverIdx === idx && dragIdx !== idx ? 'border-t-2 border-t-blue-500 dark:border-t-blue-400' : ''
-            ]"
-            @dragover="onDragOver(idx, $event)"
-            @dragleave="onDragLeave"
-            @drop="onDrop(idx)"
-          >
-            <!-- Task Row -->
-            <div
-              :draggable="canEdit"
-              :class="[
-                'flex items-center gap-2 px-4 py-2 text-sm group transition-opacity',
-                dragIdx === idx ? 'opacity-40' : '',
-                canEdit ? 'cursor-grab active:cursor-grabbing' : ''
-              ]"
-              @dragstart="onDragStart(idx, $event)"
-              @dragend="onDragEnd"
-            >
-              <span class="text-gray-300 dark:text-gray-700 text-xs shrink-0 select-none" :class="canEdit ? 'visible' : 'invisible'">&#x2630;</span>
-              <span class="text-gray-400 dark:text-gray-600 text-xs w-6 shrink-0 tabular-nums">{{ task.index }}</span>
-              <span
-                :class="typeBadgeClass(task.task_type)"
-                class="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
-              >
-                {{ typeLabel(task.task_type) }}
-              </span>
-              <span class="flex-1 truncate text-gray-600 dark:text-gray-400 font-mono text-xs">
-                {{ typeSummary(task.task_type) }}
-              </span>
-              <span
-                v-if="task.label"
-                class="text-[11px] text-gray-400 dark:text-gray-500 italic truncate max-w-[120px] shrink-0"
-              >
-                {{ task.label }}
-              </span>
-              <span
-                v-if="currentIndex === idx"
-                class="text-blue-500 dark:text-blue-400 text-xs animate-pulse shrink-0"
-              >&#9664;</span>
-              <template v-if="canEdit">
-                <button
-                  @click="moveTask(idx, -1)"
-                  :disabled="idx === 0"
-                  class="text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-30 text-sm leading-none shrink-0"
-                  title="上移"
-                >&#9650;</button>
-                <button
-                  @click="moveTask(idx, 1)"
-                  :disabled="idx === taskList.length - 1"
-                  class="text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-30 text-sm leading-none shrink-0"
-                  title="下移"
-                >&#9660;</button>
-                <button
-                  @click="startEdit(idx)"
-                  class="text-gray-300 dark:text-gray-700 hover:text-blue-500 dark:hover:text-blue-400 text-sm leading-none shrink-0"
-                  title="编辑"
-                >&#9998;</button>
-                <button
-                  @click="removeTask(idx)"
-                  class="text-gray-300 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 text-sm leading-none shrink-0"
-                  title="删除"
-                >&times;</button>
-              </template>
-            </div>
-
-            <!-- Inline Editor -->
-            <div
-              v-if="editingIndex === idx"
-              class="task-editor px-4 pb-3 pt-1 ml-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 rounded-b"
-            >
-              <!-- Send editor -->
-              <div v-if="task.task_type.type === 'Send'" class="flex flex-col gap-2">
-                <div class="flex items-center gap-1.5">
-                  <button
-                    :class="editSendMode === 'hex' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'"
-                    @click="editSendMode = 'hex'"
-                    class="px-2 py-0.5 text-[11px] font-medium rounded border transition-colors"
-                  >HEX</button>
-                  <button
-                    :class="editSendMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'"
-                    @click="editSendMode = 'text'"
-                    class="px-2 py-0.5 text-[11px] font-medium rounded border transition-colors"
-                  >文本</button>
-                </div>
-                <input
-                  v-model="editSendData"
-                  :placeholder="editSendMode === 'hex' ? '例如: AA BB CC' : '输入文本...'"
-                  class="px-2.5 py-1.5 text-sm font-mono rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
-                />
-              </div>
-
-              <!-- Delay editor -->
-              <div v-if="task.task_type.type === 'Delay'" class="flex items-center gap-1.5">
-                <input
-                  v-model.number="editDelayMs"
-                  type="text"
-                  class="w-20 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
-                />
-                <button @click="editDelayMs = Math.max(0, editDelayMs - 10)"
-                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
-                >-</button>
-                <button @click="editDelayMs = editDelayMs + 10"
-                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
-                >+</button>
-                <span class="text-xs text-gray-500 dark:text-gray-400">毫秒</span>
-              </div>
-
-              <!-- Jump editor -->
-              <div v-if="task.task_type.type === 'Jump'" class="flex items-center gap-1.5">
-                <span class="text-xs text-gray-500 dark:text-gray-400">转到任务 #</span>
-                <input
-                  v-model.number="editJumpTarget"
-                  type="text"
-                  class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
-                />
-                <button @click="editJumpTarget = Math.max(0, editJumpTarget - 1)"
-                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
-                >-</button>
-                <button @click="editJumpTarget = Math.min(taskList.length - 1, editJumpTarget + 1)"
-                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
-                >+</button>
-              </div>
-
-              <!-- LoopStart editor -->
-              <div v-if="task.task_type.type === 'LoopStart'" class="flex items-center gap-1.5">
-                <span class="text-xs text-gray-500 dark:text-gray-400">重复</span>
-                <input
-                  v-model.number="editLoopCount"
-                  type="text"
-                  class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
-                />
-                <button @click="editLoopCount = Math.max(1, editLoopCount - 1)"
-                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
-                >-</button>
-                <button @click="editLoopCount = editLoopCount + 1"
-                  class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
-                >+</button>
-                <span class="text-xs text-gray-500 dark:text-gray-400">次</span>
-              </div>
-
-              <!-- Save/Cancel -->
-              <div class="flex items-center gap-1.5 mt-2">
-                <button
-                  @click="saveEdit"
-                  class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded transition-colors"
-                >保存</button>
-                <button
-                  @click="cancelEdit"
-                  class="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                >取消</button>
-              </div>
-            </div>
-          </div>
-        </template>
-        <div v-else class="px-4 py-8 text-center text-gray-300 dark:text-gray-700 text-sm">
-          暂无任务，请添加任务
-        </div>
-      </div>
-
-      <!-- Bottom Bar: Add Task Buttons -->
+    <div class="flex-1 flex min-h-0">
+      <!-- Left Sidebar: Add Task Buttons -->
       <div
         v-if="canEdit"
-        class="flex items-center gap-1.5 px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
+        class="flex flex-col gap-1 p-2 border-r border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
       >
         <button @click="addTask('Send')"
-          class="px-2.5 py-1 text-[11px] font-medium rounded border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+          class="px-2.5 py-1.5 text-[11px] font-medium rounded border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors text-left whitespace-nowrap"
         >+ 发送</button>
         <button @click="addTask('Delay')"
-          class="px-2.5 py-1 text-[11px] font-medium rounded border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors"
+          class="px-2.5 py-1.5 text-[11px] font-medium rounded border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors text-left whitespace-nowrap"
         >+ 延时</button>
         <button @click="addTask('Jump')"
-          class="px-2.5 py-1 text-[11px] font-medium rounded border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950 transition-colors"
+          class="px-2.5 py-1.5 text-[11px] font-medium rounded border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950 transition-colors text-left whitespace-nowrap"
         >+ 跳转</button>
         <button @click="addTask('LoopStart')"
-          class="px-2.5 py-1 text-[11px] font-medium rounded border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors"
+          class="px-2.5 py-1.5 text-[11px] font-medium rounded border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors text-left whitespace-nowrap"
         >+ 循环开始</button>
         <button @click="addTask('LoopEnd')"
-          class="px-2.5 py-1 text-[11px] font-medium rounded border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors"
+          class="px-2.5 py-1.5 text-[11px] font-medium rounded border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors text-left whitespace-nowrap"
         >+ 循环结束</button>
         <button @click="addTask('Stop')"
-          class="px-2.5 py-1 text-[11px] font-medium rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+          class="px-2.5 py-1.5 text-[11px] font-medium rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors text-left whitespace-nowrap"
         >+ 停止</button>
         <button
           v-if="taskList.length > 0"
           @click="clearAll"
-          class="ml-auto px-2.5 py-1 text-[11px] font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          class="mt-2 px-2.5 py-1.5 text-[11px] font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left whitespace-nowrap"
         >清空全部</button>
+      </div>
+
+      <!-- Right: Control Bar + Task List -->
+      <div class="flex-1 flex flex-col min-h-0">
+        <!-- Control Bar -->
+        <div class="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+          <button
+            v-if="isIdle"
+            @click="startQueue"
+            :disabled="!canStart"
+            class="px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors"
+          >
+            启动
+          </button>
+          <button
+            v-if="isRunning"
+            @click="pauseQueue"
+            class="px-4 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 rounded-md transition-colors"
+          >
+            暂停
+          </button>
+          <button
+            v-if="isPaused"
+            @click="resumeQueue"
+            class="px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-md transition-colors"
+          >
+            继续
+          </button>
+          <button
+            v-if="isRunning || isPaused"
+            @click="stopQueue"
+            class="px-4 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-md transition-colors"
+          >
+            停止
+          </button>
+          <span v-if="!canStart && isIdle" class="text-xs text-gray-400 dark:text-gray-600">
+            {{ !props.isPortOpen ? '请先打开串口' : taskList.length === 0 ? '请添加任务' : '' }}
+          </span>
+        </div>
+
+        <!-- Task List -->
+        <div class="flex-1 overflow-y-auto min-h-0">
+          <template v-if="taskList.length > 0">
+            <div
+              v-for="(task, idx) in taskList"
+              :key="idx"
+              :class="[
+                'border-b border-gray-50 dark:border-gray-900 last:border-b-0 transition-colors',
+                currentIndex === idx ? 'bg-blue-50 dark:bg-blue-950' : '',
+                dragOverIdx === idx && dragIdx !== idx ? 'border-t-2 border-t-blue-500 dark:border-t-blue-400' : ''
+              ]"
+              @dragover="onDragOver(idx, $event)"
+              @dragleave="onDragLeave"
+              @drop="onDrop(idx)"
+            >
+              <!-- Task Row -->
+              <div
+                :draggable="canEdit"
+                :class="[
+                  'flex items-center gap-2 px-4 py-2 text-sm group transition-opacity',
+                  dragIdx === idx ? 'opacity-40' : '',
+                  canEdit ? 'cursor-grab active:cursor-grabbing' : ''
+                ]"
+                @dragstart="onDragStart(idx, $event)"
+                @dragend="onDragEnd"
+              >
+                <span class="text-gray-300 dark:text-gray-700 text-xs shrink-0 select-none" :class="canEdit ? 'visible' : 'invisible'">&#x2630;</span>
+                <span class="text-gray-400 dark:text-gray-600 text-xs w-6 shrink-0 tabular-nums">{{ task.index }}</span>
+                <span
+                  :class="typeBadgeClass(task.task_type)"
+                  class="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
+                >
+                  {{ typeLabel(task.task_type) }}
+                </span>
+                <span class="flex-1 truncate text-gray-600 dark:text-gray-400 font-mono text-xs">
+                  {{ typeSummary(task.task_type) }}
+                </span>
+                <span
+                  v-if="task.label"
+                  class="text-[11px] text-gray-400 dark:text-gray-500 italic truncate max-w-[120px] shrink-0"
+                >
+                  {{ task.label }}
+                </span>
+                <span
+                  v-if="currentIndex === idx"
+                  class="text-blue-500 dark:text-blue-400 text-xs animate-pulse shrink-0"
+                >&#9664;</span>
+                <template v-if="canEdit">
+                  <button
+                    @click="moveTask(idx, -1)"
+                    :disabled="idx === 0"
+                    class="text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-30 text-sm leading-none shrink-0"
+                    title="上移"
+                  >&#9650;</button>
+                  <button
+                    @click="moveTask(idx, 1)"
+                    :disabled="idx === taskList.length - 1"
+                    class="text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-30 text-sm leading-none shrink-0"
+                    title="下移"
+                  >&#9660;</button>
+                  <button
+                    @click="startEdit(idx)"
+                    class="text-gray-300 dark:text-gray-700 hover:text-blue-500 dark:hover:text-blue-400 text-sm leading-none shrink-0"
+                    title="编辑"
+                  >&#9998;</button>
+                  <button
+                    @click="removeTask(idx)"
+                    class="text-gray-300 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 text-sm leading-none shrink-0"
+                    title="删除"
+                  >&times;</button>
+                </template>
+              </div>
+
+              <!-- Inline Editor -->
+              <div
+                v-if="editingIndex === idx"
+                class="task-editor px-4 pb-3 pt-1 ml-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 rounded-b"
+              >
+                <!-- Send editor -->
+                <div v-if="task.task_type.type === 'Send'" class="flex flex-col gap-2">
+                  <div class="flex items-center gap-1.5">
+                    <button
+                      :class="editSendMode === 'hex' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'"
+                      @click="editSendMode = 'hex'"
+                      class="px-2 py-0.5 text-[11px] font-medium rounded border transition-colors"
+                    >HEX</button>
+                    <button
+                      :class="editSendMode === 'text' ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'"
+                      @click="editSendMode = 'text'"
+                      class="px-2 py-0.5 text-[11px] font-medium rounded border transition-colors"
+                    >文本</button>
+                  </div>
+                  <input
+                    v-model="editSendData"
+                    :placeholder="editSendMode === 'hex' ? '例如: AA BB CC' : '输入文本...'"
+                    class="px-2.5 py-1.5 text-sm font-mono rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                  />
+                </div>
+
+                <!-- Delay editor -->
+                <div v-if="task.task_type.type === 'Delay'" class="flex items-center gap-1.5">
+                  <input
+                    v-model.number="editDelayMs"
+                    type="text"
+                    class="w-20 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                  />
+                  <button @click="editDelayMs = Math.max(0, editDelayMs - 10)"
+                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                  >-</button>
+                  <button @click="editDelayMs = editDelayMs + 10"
+                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                  >+</button>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">毫秒</span>
+                </div>
+
+                <!-- Jump editor -->
+                <div v-if="task.task_type.type === 'Jump'" class="flex items-center gap-1.5">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">转到任务 #</span>
+                  <input
+                    v-model.number="editJumpTarget"
+                    type="text"
+                    class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                  />
+                  <button @click="editJumpTarget = Math.max(0, editJumpTarget - 1)"
+                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                  >-</button>
+                  <button @click="editJumpTarget = Math.min(taskList.length - 1, editJumpTarget + 1)"
+                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                  >+</button>
+                </div>
+
+                <!-- LoopStart editor -->
+                <div v-if="task.task_type.type === 'LoopStart'" class="flex items-center gap-1.5">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">重复</span>
+                  <input
+                    v-model.number="editLoopCount"
+                    type="text"
+                    class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                  />
+                  <button @click="editLoopCount = Math.max(1, editLoopCount - 1)"
+                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                  >-</button>
+                  <button @click="editLoopCount = editLoopCount + 1"
+                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                  >+</button>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">次</span>
+                </div>
+
+                <!-- Save/Cancel -->
+                <div class="flex items-center gap-1.5 mt-2">
+                  <button
+                    @click="saveEdit"
+                    class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded transition-colors"
+                  >保存</button>
+                  <button
+                    @click="cancelEdit"
+                    class="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                  >取消</button>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div v-else class="px-4 py-8 text-center text-gray-300 dark:text-gray-700 text-sm">
+            暂无任务，请添加任务
+          </div>
+        </div>
       </div>
     </div>
   </div>
