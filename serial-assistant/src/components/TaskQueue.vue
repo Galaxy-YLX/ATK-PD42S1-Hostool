@@ -561,10 +561,10 @@ onUnmounted(() => {
                     class="w-20 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
                   />
                   <button @click="editDelayMs = Math.max(0, editDelayMs - 10)"
-                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                    class="size-8 flex items-center justify-center text-sm font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
                   >-</button>
                   <button @click="editDelayMs = editDelayMs + 10"
-                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                    class="size-8 flex items-center justify-center text-sm font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
                   >+</button>
                   <span class="text-xs text-gray-500 dark:text-gray-400">毫秒</span>
                 </div>
@@ -578,10 +578,10 @@ onUnmounted(() => {
                     class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
                   />
                   <button @click="editJumpTarget = Math.max(0, editJumpTarget - 1)"
-                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                    class="size-8 flex items-center justify-center text-sm font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
                   >-</button>
                   <button @click="editJumpTarget = Math.min(taskList.length - 1, editJumpTarget + 1)"
-                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                    class="size-8 flex items-center justify-center text-sm font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
                   >+</button>
                 </div>
 
@@ -594,10 +594,10 @@ onUnmounted(() => {
                     class="w-16 px-2 py-1.5 text-sm font-mono text-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
                   />
                   <button @click="editLoopCount = Math.max(1, editLoopCount - 1)"
-                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                    class="size-8 flex items-center justify-center text-sm font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
                   >-</button>
                   <button @click="editLoopCount = editLoopCount + 1"
-                    class="w-5 h-5 flex items-center justify-center text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
+                    class="size-8 flex items-center justify-center text-sm font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors leading-none"
                   >+</button>
                   <span class="text-xs text-gray-500 dark:text-gray-400">次</span>
                 </div>
