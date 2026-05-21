@@ -503,6 +503,11 @@ onUnmounted(() => {
                 >&#9664;</span>
                 <template v-if="canEdit">
                   <button
+                    @click="startEdit(idx)"
+                    class="text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 text-base leading-none shrink-0"
+                    title="编辑"
+                  >&#9998;</button>
+                  <button
                     @click="moveTask(idx, -1)"
                     :disabled="idx === 0"
                     class="text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-30 text-sm leading-none shrink-0"
@@ -514,11 +519,6 @@ onUnmounted(() => {
                     class="text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-30 text-sm leading-none shrink-0"
                     title="下移"
                   >&#9660;</button>
-                  <button
-                    @click="startEdit(idx)"
-                    class="text-gray-300 dark:text-gray-700 hover:text-blue-500 dark:hover:text-blue-400 text-sm leading-none shrink-0"
-                    title="编辑"
-                  >&#9998;</button>
                   <button
                     @click="removeTask(idx)"
                     class="text-gray-300 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 text-sm leading-none shrink-0"
