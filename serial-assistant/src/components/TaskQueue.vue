@@ -521,7 +521,7 @@ onUnmounted(() => {
                   >&#9660;</button>
                   <button
                     @click="removeTask(idx)"
-                    class="text-gray-300 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 text-sm leading-none shrink-0"
+                    class="btn-delete text-gray-300 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 leading-none shrink-0"
                     title="删除"
                   >&times;</button>
                 </template>
@@ -624,3 +624,9 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.btn-delete {
+  font-size: 1.5rem; /* 手动修改此处: 0.875rem=sm, 1rem=base, 1.125rem=lg, 1.25rem=xl, 1.5rem=2xl */
+}
+</style>
