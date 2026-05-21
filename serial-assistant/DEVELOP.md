@@ -1,8 +1,8 @@
-# 串口助手 二次开发教程
+# 简易串口助手 二次开发教程
 
 ## 项目概述
 
-本项目是一个基于 **Tauri v2** + **Vue 3 + TypeScript** + **Tailwind CSS** 的跨平台串口调试助手，用于替代正点原子 PD42S1 步进电机官方上位机。支持 Linux / Windows / macOS。
+本项目是一个基于 **Tauri v2** + **Vue 3 + TypeScript** + **Tailwind CSS** 的跨平台串口调试助手，支持多标签页同时连接多个串口设备。支持 Linux / Windows / macOS。
 
 - **前端**: Vue 3 (Composition API) + TypeScript + Tailwind CSS v3
 - **后端**: Rust + Tauri v2 + serialport
@@ -16,12 +16,11 @@
 
 | 硬件 | 说明 |
 |------|------|
-| 正点原子 PD42S1 步进电机驱动器 | 或兼容的自定义协议串口设备 |
 | USB 转 TTL 串口模块 | CH340 / CP2102 / FT232 等 |
-| 杜邦线 | 连接驱动器与串口模块 (GND、TXD、RXD) |
-| 24V 直流电源 | 为驱动器供电 |
+| 目标串口设备 | 如步进电机驱动器、单片机、传感器等 |
+| 杜邦线 | 连接目标设备与串口模块 (GND、TXD、RXD) |
 
-> **接线参考**: 驱动器端 TXD → 串口模块 RXD，驱动器端 RXD → 串口模块 TXD，驱动器端 GND → 串口模块 GND。通信波特率默认 115200。
+> **接线参考**: 目标设备 TXD → 串口模块 RXD，目标设备 RXD → 串口模块 TXD，GND ↔ GND。
 
 ### 1.2 软件依赖
 
@@ -74,7 +73,6 @@ sudo pacman -S webkit2gtk-4.1 libappindicator-gtk3 librsvg openssl
 
 **macOS**:
 ```bash
-# 安装 Xcode Command Line Tools
 xcode-select --install
 ```
 
@@ -90,21 +88,15 @@ Linux 下默认普通用户无权访问串口设备，必须配置权限：
 # 将当前用户加入 dialout 组
 sudo usermod -aG dialout $USER
 
-# 将当前用户加入 tty 组 (部分发行版需要)
-sudo usermod -aG tty $USER
-
 # 重新登录或重启使权限生效
 # 验证: groups 命令的输出中应包含 dialout
 groups
 ```
 
-**Fedora 额外步骤** — CH340 驱动 (常见于廉价串口模块):
+**Fedora 额外步骤** — CH340 驱动:
 ```bash
 # 检查内核是否已内置 ch341 驱动
 lsmod | grep ch341
-
-# 如果没有输出，安装驱动
-sudo dnf install kernel-devel
 # 驱动通常已内置，无需手动编译
 ```
 
@@ -125,19 +117,7 @@ git clone git@github.com:Galaxy-YLX/ATK_PD42S_V1.0.git
 git clone https://github.com/Galaxy-YLX/ATK_PD42S_V1.0.git
 
 cd ATK_PD42S_V1.0
-```
-
-仓库包含三个分支，可根据需要切换：
-
-| 分支 | 说明 |
-|------|------|
-| `PD42上位机` | 设备设置 + 运动控制面板 |
-| `队列串口V1.1` | 带任务队列系统的版本 |
-| `简易串口助手v1.0` | 基础串口收发功能 |
-
-```bash
-git branch -a         # 查看所有分支
-git checkout 队列串口V1.1   # 切换到任务队列分支
+git checkout 简易串口助手v1.0
 ```
 
 ### 1.5 安装与首次运行
@@ -165,8 +145,6 @@ registry = "https://mirrors.ustc.edu.cn/crates.io-index"
 
 ### 1.6 环境验证清单
 
-完成以上步骤后，逐项检查：
-
 | 检查项 | 命令 | 预期结果 |
 |--------|------|----------|
 | Node.js 版本 | `node -v` | v18+ |
@@ -174,7 +152,7 @@ registry = "https://mirrors.ustc.edu.cn/crates.io-index"
 | 系统库 | `pkg-config --libs webkit2gtk-4.1` | 输出库路径 (Linux) |
 | 串口权限 | `groups \| grep dialout` | 包含 dialout |
 | 串口设备 | `ls /dev/ttyUSB*` | 列出串口 (插入模块后) |
-| npm 依赖 | `cd serial-assistant && ls node_modules/.package-lock.json` | 文件存在 |
+| npm 依赖 | `ls serial-assistant/node_modules/.package-lock.json` | 文件存在 |
 | Tauri 编译 | `cd serial-assistant && npm run tauri dev` | 窗口正常打开 |
 
 ### 1.7 环境常见问题
@@ -203,10 +181,9 @@ serial-assistant/
 ├── src/                        # 前端源代码
 │   ├── main.ts                 # Vue 入口
 │   ├── style.css               # 全局样式 (Tailwind 指令)
-│   ├── App.vue                 # 根组件 (多标签页框架)
+│   ├── App.vue                 # 根组件 (多标签页框架、主题切换)
 │   └── components/
-│       ├── SerialPanel.vue     # 串口面板 (配置/收发/历史)
-│       └── TaskQueue.vue       # 任务队列面板
+│       └── SerialPanel.vue     # 串口面板 (配置/收发/发送历史)
 ├── src-tauri/                  # Rust 后端源代码
 │   ├── Cargo.toml              # Rust 依赖配置
 │   ├── tauri.conf.json         # Tauri 应用配置
@@ -215,7 +192,7 @@ serial-assistant/
 │   ├── icons/                  # 应用图标
 │   └── src/
 │       ├── main.rs             # Rust 入口
-│       └── lib.rs              # 核心逻辑 (串口/队列/命令)
+│       └── lib.rs              # 核心逻辑 (串口管理、Tauri 命令)
 └── public/                     # 静态资源
 ```
 
@@ -225,8 +202,7 @@ serial-assistant/
 |------|------|
 | `App.vue` | 多标签页框架、主题切换 |
 | `SerialPanel.vue` | 串口配置、数据收发、发送历史 |
-| `TaskQueue.vue` | 可视化任务队列编辑器 |
-| `lib.rs` | 串口管理、任务队列执行引擎、Tauri 命令 |
+| `lib.rs` | 串口生命周期管理、后台读线程、Tauri 命令 |
 
 ---
 
@@ -257,80 +233,49 @@ serial-assistant/
 
 ```
 SerialState                           // 应用全局状态
-├── connections: HashMap<port_id, PortConnection>
-│   └── PortConnection
-│       ├── port: Arc<Mutex<Option<Box<dyn SerialPort>>>>
-│       ├── running: Arc<AtomicBool>   // 读线程控制
-│       └── read_thread: JoinHandle<()>
-└── queues: HashMap<port_id, QueueState>
-    └── QueueState
-        ├── running: Arc<AtomicBool>   // 队列执行控制
-        ├── paused: Arc<AtomicBool>    // 队列暂停控制
-        └── thread_handle: JoinHandle<()>
+└── connections: HashMap<port_id, PortConnection>
+    └── PortConnection
+        ├── port: Arc<Mutex<Option<Box<dyn SerialPort>>>>
+        ├── running: Arc<AtomicBool>   // 读线程控制
+        └── read_thread: JoinHandle<()>
 ```
 
-每个标签页有一个唯一的 `port_id` (UUID)，通过它关联串口连接和任务队列。
-
-### 3.3 任务队列引擎
-
-任务队列是一个简单的字节码解释器：
-
-```
-TaskItem { index, task_type, label }
-                │
-                ▼
-┌──────────────────────────────────────────┐
-│ TaskType:                                │
-│  Send     { data: Vec<u8> }              │ 发送数据
-│  Delay    { ms: u64 }                    │ 延时等待
-│  Jump     { target: usize }              │ 跳转到指定任务
-│  LoopStart{ count: u32 }                 │ 循环开始
-│  LoopEnd                                 │ 循环结束
-│  Stop                                    │ 停止执行
-└──────────────────────────────────────────┘
-
-执行流程: pc++ → 取指令 → 执行 → 循环
-循环实现: 遇到 LoopStart 将 (位置, 次数) 压栈
-         遇到 LoopEnd 检查栈顶，次数>1 则跳回
-```
+每个标签页有一个唯一的 `port_id` (UUID)，通过它关联串口连接。后台读线程持续轮询串口，收到数据后通过事件推送到前端。
 
 ---
 
 ## 4. 前端开发指南
 
-### 4.1 添加新页面/面板
+### 4.1 在 SerialPanel 中添加新功能
 
-在 `App.vue` 的标签页内容区域 (由 `currentPage` 切换) 添加新页面：
-
-```vue
-<!-- App.vue template 中 -->
-<div v-if="currentPage === '设备设置'">
-  <!-- 现有内容 -->
-</div>
-<div v-if="currentPage === '运动控制'">
-  <!-- 现有内容 -->
-</div>
-<!-- 新增页面 -->
-<div v-if="currentPage === '数据可视化'">
-  <DataChart :portId="activeTabId" />
-</div>
-```
-
-然后在页面切换按钮区添加按钮：
+`SerialPanel.vue` 是本项目的核心组件，包含串口配置、数据收发、发送历史。添加新功能时直接在组件内扩展：
 
 ```vue
-<button
-  v-for="page in ['设备设置', '运动控制', '数据可视化']"
-  :key="page"
-  @click="currentPage = page"
-  ...
->{{ page }}</button>
+<script setup lang="ts">
+// 添加新的响应式状态
+const myNewFeature = ref(false);
+
+// 添加新的方法
+async function myNewAction() {
+  // 你的逻辑
+}
+</script>
+
+<template>
+  <!-- 在现有 UI 中添加新控件 -->
+  <button @click="myNewAction" :disabled="!isOpen"
+    class="px-3 py-1 text-xs font-medium rounded-md ...">
+    新功能
+  </button>
+</template>
 ```
 
-### 4.2 创建新组件
+### 4.2 创建独立组件
+
+如需较大的功能模块，创建新组件：
 
 ```bash
-touch src/components/DataChart.vue
+touch src/components/MyPanel.vue
 ```
 
 组件模板：
@@ -346,7 +291,6 @@ let unlisten: UnlistenFn | null = null;
 
 onMounted(async () => {
   unlisten = await listen<number[]>(`serial-data:${props.portId}`, (event) => {
-    // 处理收到的串口数据
     console.log("收到数据:", event.payload);
   });
 });
@@ -363,6 +307,13 @@ onUnmounted(() => {
 </template>
 ```
 
+然后在 `SerialPanel.vue` 或 `App.vue` 中引入使用：
+
+```vue
+import MyPanel from "./components/MyPanel.vue";
+<!-- <MyPanel :portId="props.tabId" /> -->
+```
+
 ### 4.3 调用后端命令
 
 ```typescript
@@ -373,7 +324,7 @@ const ports = await invoke<string[]>("get_serial_ports");
 
 // 打开串口
 await invoke("open_serial", {
-  portId: props.portId,
+  portId: props.tabId,
   portName: "/dev/ttyUSB0",
   baudRate: 115200,
   dataBits: 8,
@@ -381,10 +332,10 @@ await invoke("open_serial", {
   parity: "None",
 });
 
-// 发送数据
+// 发送数据 (raw bytes)
 await invoke("send_serial", {
-  portId: props.portId,
-  data: [0xC5, 0x01, 0xFA, 0x00, 0xFA, 0x5C],
+  portId: props.tabId,
+  data: [0x48, 0x65, 0x6C, 0x6C, 0x6F],  // "Hello" in ASCII
 });
 ```
 
@@ -397,14 +348,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 const unlisten = await listen<number[]>(`serial-data:${portId}`, (event) => {
   console.log("收到字节:", event.payload); // number[]
 });
-
-// 队列状态事件: queue-update:{portId}
-await listen<{ status: string; current?: number }>(
-  `queue-update:${portId}`,
-  (event) => {
-    console.log("队列状态:", event.payload.status);
-  }
-);
 
 // 组件卸载时取消监听
 onUnmounted(() => { if (unlisten) unlisten(); });
@@ -437,7 +380,6 @@ fn my_new_command(
     state: tauri::State<'_, SerialState>,
     some_arg: String,
 ) -> Result<String, String> {
-    // 你的逻辑
     Ok(format!("接收到的参数: {}", some_arg))
 }
 ```
@@ -451,7 +393,7 @@ fn my_new_command(
 ])
 ```
 
-前端即可调用：
+前端调用：
 
 ```typescript
 const result = await invoke<string>("my_new_command", { someArg: "hello" });
@@ -460,8 +402,6 @@ const result = await invoke<string>("my_new_command", { someArg: "hello" });
 ### 5.2 访问串口
 
 ```rust
-use serialport::{SerialPort};
-
 // 在 PortConnection 中获取串口引用
 let port = connection.port.lock().unwrap();
 if let Some(ref mut serial) = *port {
@@ -490,8 +430,7 @@ let port_clone = Arc::clone(&port);
 
 let handle = thread::spawn(move || {
     while running_clone.load(Ordering::Relaxed) {
-        // 执行循环工作
-        // 例如读取串口数据、发送到前端
+        // 执行循环工作，例如读取串口数据
         thread::sleep(Duration::from_millis(10));
     }
 });
@@ -508,9 +447,6 @@ use tauri::Emitter;
 
 // 在命令函数中，app_handle 通过参数获取
 app_handle.emit("my-event", payload).map_err(|e| e.to_string())?;
-
-// 发送到特定窗口
-window.emit("my-event", payload).map_err(|e| e.to_string())?;
 ```
 
 ### 5.5 添加依赖
@@ -519,11 +455,8 @@ window.emit("my-event", payload).map_err(|e| e.to_string())?;
 
 ```toml
 [dependencies]
-# 现有依赖...
-my-crate = "1.0"                    # 纯 Rust crate
+my-crate = "1.0"
 ```
-
-如果是需要系统库的 crate (如 `serialport`)，需确保开发环境已安装对应的系统依赖。
 
 ---
 
@@ -533,43 +466,20 @@ my-crate = "1.0"                    # 纯 Rust crate
 
 1. **Rust 侧** (`lib.rs`): 在 `open_serial` 命令签名中添加参数，传递给 `serialport::new()` 的 builder。
 2. **前端侧** (`SerialPanel.vue`): 添加对应的 UI 控件 (dropdown/input)，绑定到 `invoke` 调用。
-3. **需要同时修改的类型**: `open_serial` 的参数列表和前端 `invoke` 的参数对象必须匹配 (参数名用 camelCase)。
+3. **注意**: 前端 `invoke` 参数名用 camelCase，Rust 侧用 snake_case，Tauri 自动转换。
 
-### 6.2 添加新的任务类型
+### 6.2 添加自定义数据解析
 
-1. **Rust 侧** (`lib.rs`): 在 `TaskType` 枚举中添加新变体。
-2. **队列执行逻辑**: 在 `run_queue` 函数的 match 分支中添加新类型的处理。
-3. **前端侧** (`TaskQueue.vue`): 
-   - 在任务类型按钮区添加新按钮
-   - 在 `addTask` / `getDefaultTask` 中添加默认值
-   - 添加对应的编辑面板
+在 `SerialPanel.vue` 的 `recordRecv` 相关逻辑中添加解析：
 
-### 6.3 实现 PD42 自定义协议
-
-PD42 使用帧格式：`[C5] [addr] [code] [data...] [checksum] [5C]`
-
-校验和 = 帧头到数据区的所有字节之和的低 8 位。
-
-当前项目已在前端 `App.vue` 中有 `customFrame()` 辅助函数，但未系统化。建议方案：
-
-1. **创建协议模块** (`src/utils/protocol.ts`):
 ```typescript
-// 帧构造
-function buildFrame(addr: number, code: number, data: number[]): number[] {
-  const head = [0xC5, addr, code, ...data];
-  const sum = head.reduce((a, b) => a + b, 0);
-  return [...head, sum & 0xFF, 0x5C];
-}
-
-// 帧解析
-function parseFrame(bytes: number[]): { addr: number; code: number; data: number[] } | null {
-  // 查找帧头 C5...帧尾 5C，验证校验和
+function parseIncomingData(bytes: number[]) {
+  // 按你的协议解析，例如提取帧、计算校验和等
+  // 将解析结果显示在 UI 中
 }
 ```
 
-2. **或在 Rust 侧实现**: 在 `lib.rs` 中添加 `send_pd42_command` 命令，封装协议细节。
-
-### 6.4 修改应用配置
+### 6.3 修改应用配置
 
 编辑 `src-tauri/tauri.conf.json`:
 
@@ -581,9 +491,6 @@ function parseFrame(bytes: number[]): { addr: number; code: number; data: number
       "width": 1024,
       "height": 768
     }]
-  },
-  "bundle": {
-    "icon": ["icons/32x32.png", ...]
   }
 }
 ```
@@ -624,23 +531,12 @@ npm run preview  # 预览构建结果 (纯前端，不含 Tauri)
 
 在 `npm run tauri dev` 运行时，右键点击应用窗口 → **Inspect Element** 打开 Chrome DevTools。
 
-或者在 `tauri.conf.json` 中临时设置窗口初始可见：
-```json
-{ "visible": true }
-```
-
 ### 8.2 后端调试
 
 使用 `println!()` 或 `eprintln!()` 输出到终端，开发模式下会显示在启动 Tauri 的终端中。
 
-更好的方式：
 ```rust
-// Cargo.toml
-[dependencies]
-log = "0.4"
-
-// 代码中
-log::info!("串口状态: {:?}", state);
+eprintln!("串口状态: {:?}", state);
 ```
 
 ### 8.3 常见问题
@@ -661,7 +557,6 @@ log::info!("串口状态: {:?}", state);
 - [Vue 3 文档](https://cn.vuejs.org/)
 - [Tailwind CSS 文档](https://tailwindcss.com/docs)
 - [serialport crate](https://docs.rs/serialport/latest/serialport/)
-- [正点原子 PD42S1 产品资料](https://www.openedv.com/docs/motors/step-motors/pd42s1.html)
 
 ---
 
