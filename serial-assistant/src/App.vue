@@ -360,17 +360,6 @@ onUnmounted(() => {
   <div class="min-h-screen bg-gray-100 dark:bg-gray-950 p-5 font-sans text-gray-900 dark:text-gray-100 transition-colors">
     <div class="max-w-6xl mx-auto">
 
-      <!-- 标题栏 -->
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-semibold tracking-tight">正点原子步进电机驱动器上位机 V2.0</h1>
-        <button
-          @click="toggleTheme"
-          class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          {{ theme === "dark" ? "☀ 白天模式" : "☾ 黑夜模式" }}
-        </button>
-      </div>
-
       <!-- 错误提示 -->
       <div
         v-if="errorMsg"
@@ -405,17 +394,24 @@ onUnmounted(() => {
           </select>
         </div>
 
+        <button
+          @click="toggleTheme"
+          class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        >
+          {{ theme === "dark" ? "☀ 白天模式" : "☾ 黑夜模式" }}
+        </button>
+
+        <span class="ml-auto text-xs font-medium" :class="isOpen ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-600'">
+          {{ isOpen ? "● 已连接" : "○ 未连接" }}
+        </span>
+
         <button @click="toggleSerial"
           :class="isOpen
             ? 'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600'
             : 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600'"
-          class="ml-auto px-5 py-1.5 text-sm font-semibold text-white rounded-md transition-colors">
+          class="px-5 py-1.5 text-sm font-semibold text-white rounded-md transition-colors">
           {{ isOpen ? "关闭串口" : "打开串口" }}
         </button>
-
-        <span class="text-xs font-medium" :class="isOpen ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-600'">
-          {{ isOpen ? "● 已连接" : "○ 未连接" }}
-        </span>
       </div>
 
       <!-- 主内容区：两栏 -->
