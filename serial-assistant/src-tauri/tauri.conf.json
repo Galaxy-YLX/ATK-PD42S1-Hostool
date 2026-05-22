@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "串口助手",
+        "title": "队列串口",
         "width": 800,
         "height": 600,
         "visible": false
