@@ -46,6 +46,42 @@ const isPaused = computed(() => queueStatus.value === "Paused");
 const isIdle = computed(() => queueStatus.value === "Idle" || queueStatus.value === "Stopped");
 const canEdit = computed(() => isIdle.value);
 
+// 计算每个任务的嵌套深度（用于缩进和引导线）
+const nestingDepths = computed(() => {
+  const depths: number[] = [];
+  let depth = 0;
+  for (const task of taskList.value) {
+    if (task.task_type.type === "LoopEnd") {
+      depths.push(depth);
+      depth = Math.max(0, depth - 1);
+    } else {
+      depths.push(depth);
+      if (task.task_type.type === "LoopStart") {
+        depth++;
+      }
+    }
+  }
+  return depths;
+});
+
+const indentGuideColors = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b"];
+
+function indentStyle(depth: number) {
+  if (depth === 0) return {};
+  const padLeft = 12 + depth * 20;
+  const gradients = [];
+  for (let i = 0; i < depth; i++) {
+    const x = 12 + i * 20;
+    gradients.push(
+      `linear-gradient(to right, transparent ${x}px, ${indentGuideColors[i % indentGuideColors.length]} ${x}px, ${indentGuideColors[i % indentGuideColors.length]} ${x + 1}px, transparent ${x + 1}px)`
+    );
+  }
+  return {
+    paddingLeft: `${padLeft}px`,
+    backgroundImage: gradients.join(", "),
+  };
+}
+
 const statusText = computed(() => {
   switch (queueStatus.value) {
     case "Running": return "● 运行中";
@@ -472,8 +508,9 @@ onUnmounted(() => {
               <!-- Task Row -->
               <div
                 :draggable="canEdit"
+                :style="indentStyle(nestingDepths[idx])"
                 :class="[
-                  'flex items-center gap-2 px-4 py-2 text-sm group transition-opacity',
+                  'flex items-center gap-2 pr-4 py-2 text-sm group transition-opacity',
                   dragIdx === idx ? 'opacity-40' : '',
                   canEdit ? 'cursor-grab active:cursor-grabbing' : ''
                 ]"
@@ -503,6 +540,7 @@ onUnmounted(() => {
                 >&#9664;</span>
                 <template v-if="canEdit">
                   <button
+                    v-if="task.task_type.type !== 'LoopEnd' && task.task_type.type !== 'Stop'"
                     @click="startEdit(idx)"
                     class="text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 text-base leading-none shrink-0"
                     title="编辑"

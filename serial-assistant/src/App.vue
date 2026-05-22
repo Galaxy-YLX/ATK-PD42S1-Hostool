@@ -53,17 +53,6 @@ onMounted(() => {
   <div class="min-h-screen bg-gray-100 dark:bg-gray-950 p-5 font-sans text-gray-900 dark:text-gray-100 transition-colors">
     <div class="max-w-4xl mx-auto">
 
-      <!-- 标题栏 -->
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-semibold tracking-tight">串口助手</h1>
-        <button
-          @click="toggleTheme"
-          class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          {{ theme === "dark" ? "☀ 白天模式" : "☾ 黑夜模式" }}
-        </button>
-      </div>
-
       <!-- 标签栏 -->
       <div class="flex items-center gap-1 mb-3 overflow-x-auto">
         <button
@@ -73,7 +62,7 @@ onMounted(() => {
           :class="activeTabId === tab.id
             ? 'border-blue-500 dark:border-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'
             : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors whitespace-nowrap"
         >
           <span
             class="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -90,6 +79,12 @@ onMounted(() => {
           class="px-3 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors whitespace-nowrap"
         >
           + 新标签
+        </button>
+        <button
+          @click="toggleTheme"
+          class="ml-auto px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        >
+          {{ theme === "dark" ? "☀ 白天模式" : "☾ 黑夜模式" }}
         </button>
       </div>
 
