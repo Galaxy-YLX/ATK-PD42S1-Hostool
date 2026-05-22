@@ -73,7 +73,7 @@ onMounted(() => {
           :class="activeTabId === tab.id
             ? 'border-blue-500 dark:border-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'
             : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors whitespace-nowrap"
         >
           <span
             class="w-1.5 h-1.5 rounded-full flex-shrink-0"
