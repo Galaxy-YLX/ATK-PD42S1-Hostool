@@ -163,6 +163,40 @@ fn send_serial(
     }
 }
 
+#[tauri::command]
+fn set_rts(
+    state: State<'_, SerialState>,
+    port_id: String,
+    level: bool,
+) -> Result<(), String> {
+    let connections = state.connections.lock().map_err(|e| e.to_string())?;
+    let entry = connections.get(&port_id).ok_or("串口未打开")?;
+    let mut port_guard = entry.port.lock().map_err(|e| e.to_string())?;
+    if let Some(ref mut port) = *port_guard {
+        port.write_request_to_send(level)
+            .map_err(|e| format!("设置 RTS 失败: {}", e))
+    } else {
+        Err("串口未打开".into())
+    }
+}
+
+#[tauri::command]
+fn set_dtr(
+    state: State<'_, SerialState>,
+    port_id: String,
+    level: bool,
+) -> Result<(), String> {
+    let connections = state.connections.lock().map_err(|e| e.to_string())?;
+    let entry = connections.get(&port_id).ok_or("串口未打开")?;
+    let mut port_guard = entry.port.lock().map_err(|e| e.to_string())?;
+    if let Some(ref mut port) = *port_guard {
+        port.write_data_terminal_ready(level)
+            .map_err(|e| format!("设置 DTR 失败: {}", e))
+    } else {
+        Err("串口未打开".into())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -178,7 +212,9 @@ pub fn run() {
             get_serial_ports,
             open_serial,
             close_serial,
-            send_serial
+            send_serial,
+            set_rts,
+            set_dtr
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

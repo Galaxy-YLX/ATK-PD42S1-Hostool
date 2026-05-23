@@ -19,6 +19,8 @@ const stopBits = ref(1);
 const parity = ref("None");
 const isOpen = ref(false);
 const errorMsg = ref("");
+const rtsEnabled = ref(false);
+const dtrEnabled = ref(false);
 
 const baudRates = [9600, 14400, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 
@@ -29,11 +31,17 @@ interface DataEntry {
 }
 
 const displayMode = ref<"text" | "hex">("text");
+const autoScroll = ref(true);
 const dataEntries = ref<DataEntry[]>([]);
 const dataViewer = ref<HTMLDivElement>();
 
 const sendMode = ref<"text" | "hex">("text");
 const sendData = ref("");
+const lineEnding = ref<"none" | "crlf" | "cr" | "lf">("crlf");
+
+const autoSendEnabled = ref(false);
+const autoSendInterval = ref(1000);
+let autoSendTimer: ReturnType<typeof setInterval> | null = null;
 
 let unlisten: UnlistenFn | null = null;
 
@@ -53,6 +61,22 @@ const txHistory = computed(() =>
 
 watch([isOpen, selectedPort], ([open, port]) => {
   emit("connection-changed", { isOpen: open, portName: open ? port : "" });
+});
+
+watch(autoScroll, (enabled) => {
+  if (enabled) scrollToBottom();
+});
+
+watch([autoSendEnabled, autoSendInterval], ([enabled, _interval]) => {
+  if (enabled) startAutoSend();
+  else stopAutoSend();
+});
+
+watch(isOpen, (open) => {
+  if (!open) {
+    stopAutoSend();
+    autoSendEnabled.value = false;
+  }
 });
 
 function padTime(n: number): string {
@@ -101,17 +125,42 @@ async function openSerial() {
     isOpen.value = true;
     errorMsg.value = "";
     dataEntries.value = [];
+    rtsEnabled.value = false;
+    dtrEnabled.value = false;
   } catch (error) {
     errorMsg.value = error as string;
   }
 }
 
 async function closeSerial() {
+  stopAutoSend();
   try {
     await invoke("close_serial", { portId: props.tabId });
     isOpen.value = false;
+    rtsEnabled.value = false;
+    dtrEnabled.value = false;
   } catch (error) {
     errorMsg.value = error as string;
+  }
+}
+
+async function setRts() {
+  if (!isOpen.value) return;
+  try {
+    await invoke("set_rts", { portId: props.tabId, level: rtsEnabled.value });
+  } catch (error) {
+    errorMsg.value = error as string;
+    rtsEnabled.value = !rtsEnabled.value;
+  }
+}
+
+async function setDtr() {
+  if (!isOpen.value) return;
+  try {
+    await invoke("set_dtr", { portId: props.tabId, level: dtrEnabled.value });
+  } catch (error) {
+    errorMsg.value = error as string;
+    dtrEnabled.value = !dtrEnabled.value;
   }
 }
 
@@ -131,6 +180,13 @@ async function send() {
   } else {
     const encoder = new TextEncoder();
     data = Array.from(encoder.encode(sendData.value));
+    if (lineEnding.value === "crlf") {
+      data.push(0x0d, 0x0a);
+    } else if (lineEnding.value === "cr") {
+      data.push(0x0d);
+    } else if (lineEnding.value === "lf") {
+      data.push(0x0a);
+    }
   }
   try {
     await invoke("send_serial", { portId: props.tabId, data });
@@ -139,6 +195,26 @@ async function send() {
     scrollToBottom();
   } catch (error) {
     errorMsg.value = error as string;
+  }
+}
+
+function startAutoSend() {
+  stopAutoSend();
+  if (!autoSendEnabled.value || !isOpen.value) return;
+  autoSendTimer = setInterval(() => {
+    if (!autoSendEnabled.value || !isOpen.value) {
+      stopAutoSend();
+      return;
+    }
+    if (!sendData.value) return;
+    send();
+  }, Math.max(100, autoSendInterval.value));
+}
+
+function stopAutoSend() {
+  if (autoSendTimer !== null) {
+    clearInterval(autoSendTimer);
+    autoSendTimer = null;
   }
 }
 
@@ -198,6 +274,7 @@ function trimData() {
 }
 
 function scrollToBottom() {
+  if (!autoScroll.value) return;
   nextTick(() => {
     if (dataViewer.value) {
       dataViewer.value.scrollTop = dataViewer.value.scrollHeight;
@@ -215,6 +292,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  stopAutoSend();
   if (unlisten) unlisten();
   if (isOpen.value) {
     invoke("close_serial", { portId: props.tabId });
@@ -282,6 +360,23 @@ onUnmounted(() => {
         </select>
       </div>
 
+      <div class="flex items-center gap-3 ml-2">
+        <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+          :class="{ 'opacity-40': !isOpen }">
+          <input type="checkbox" v-model="rtsEnabled" :disabled="!isOpen"
+            @change="setRts"
+            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 disabled:opacity-40" />
+          RTS
+        </label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+          :class="{ 'opacity-40': !isOpen }">
+          <input type="checkbox" v-model="dtrEnabled" :disabled="!isOpen"
+            @change="setDtr"
+            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 disabled:opacity-40" />
+          DTR
+        </label>
+      </div>
+
       <button @click="toggleSerial"
         :class="isOpen
           ? 'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600'
@@ -319,6 +414,13 @@ onUnmounted(() => {
             class="px-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             清空
           </button>
+          <button @click="autoScroll = !autoScroll"
+            :class="autoScroll
+              ? 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              : 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'"
+            class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
+            {{ autoScroll ? '自动滚动' : '已锁定' }}
+          </button>
         </div>
       </div>
       <div ref="dataViewer" class="h-80 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-950 font-mono text-sm leading-relaxed whitespace-pre-wrap break-all">
@@ -355,6 +457,13 @@ onUnmounted(() => {
             class="px-2.5 py-1 text-xs font-medium rounded border transition-colors">
             HEX
           </button>
+          <select v-model="lineEnding"
+            class="select-arrow pr-7 pl-2.5 py-1 text-xs font-medium rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-colors min-w-[100px]">
+            <option value="none">换行: 无</option>
+            <option value="crlf">换行: \\r\\n</option>
+            <option value="cr">换行: \\r</option>
+            <option value="lf">换行: \\n</option>
+          </select>
         </div>
       </div>
       <div class="flex gap-2 p-4">
@@ -363,6 +472,23 @@ onUnmounted(() => {
           :placeholder="sendMode === 'hex' ? '例如: AA BB CC 0D 0A' : '输入要发送的文本...'"
           @keyup.enter="send"
           class="flex-1 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono transition-colors" />
+        <div class="flex items-center gap-1.5">
+          <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap">
+            <input type="checkbox" v-model="autoSendEnabled" :disabled="!isOpen"
+              class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+            定时
+          </label>
+          <input
+            type="number"
+            v-model.number="autoSendInterval"
+            :disabled="!autoSendEnabled || !isOpen"
+            min="100"
+            max="60000"
+            step="100"
+            class="w-20 px-2 py-1 text-xs rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-40 focus:border-blue-500 dark:focus:border-blue-400 outline-none font-mono"
+          />
+          <span class="text-xs text-gray-400 dark:text-gray-600">ms</span>
+        </div>
         <button @click="send" :disabled="!isOpen"
           class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors">
           发送
